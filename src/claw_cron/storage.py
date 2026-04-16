@@ -26,6 +26,7 @@ class Task:
         script: Shell command to run (command type).
         prompt: AI prompt to send (agent type).
         client: AI client to use — "kiro-cli", "codebuddy", or "opencode" (agent type).
+        client_cmd: Full command template override for this task (highest priority, overrides config.yaml and built-in defaults). Use {prompt} as placeholder.
         enabled: Whether the task is active. Defaults to True.
     """
 
@@ -35,6 +36,7 @@ class Task:
     script: str | None = None
     prompt: str | None = None
     client: str | None = None
+    client_cmd: str | None = None
     enabled: bool = field(default=True)
 
 
@@ -114,3 +116,25 @@ def delete_task(name: str, path: Path = TASKS_FILE) -> bool:
         return False
     save_tasks(filtered, path)
     return True
+
+
+def update_task(name: str, path: Path = TASKS_FILE, **kwargs: Any) -> bool:
+    """Update fields of an existing task by name.
+
+    Args:
+        name: Name of the task to update.
+        path: Path to the tasks YAML file.
+        **kwargs: Fields to update (e.g., enabled=True, client_cmd="...").
+
+    Returns:
+        True if task was found and updated, False if not found.
+    """
+    tasks = load_tasks(path)
+    for task in tasks:
+        if task.name == name:
+            for key, value in kwargs.items():
+                if hasattr(task, key):
+                    setattr(task, key, value)
+            save_tasks(tasks, path)
+            return True
+    return False
