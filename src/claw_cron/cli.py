@@ -10,6 +10,7 @@ from claw_cron.__about__ import __version__
 from claw_cron.cmd.add import add
 from claw_cron.cmd.channels import channels
 from claw_cron.cmd.chat import chat
+from claw_cron.cmd.command import command
 from claw_cron.cmd.config import config
 from claw_cron.cmd.delete import delete
 from claw_cron.cmd.list import list_tasks
@@ -33,6 +34,7 @@ def cli() -> None:
 
 cli.add_command(add)
 cli.add_command(channels)
+cli.add_command(command)
 cli.add_command(list_tasks)
 cli.add_command(delete)
 cli.add_command(run)
