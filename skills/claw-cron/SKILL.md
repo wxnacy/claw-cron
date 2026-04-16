@@ -11,6 +11,12 @@ description: AI-powered cron task manager for scheduling and managing automated 
 # Add command task
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
 
+# Interactive command creation
+claw-cron command
+
+# Direct command creation
+claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
+
 # Add AI agent task
 claw-cron add --name ai-task --cron "0 9 * * *" --type agent --prompt "总结今日待办" --client codebuddy
 
@@ -25,11 +31,12 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 | Command | Description |
 |---------|-------------|
 | `claw-cron add` | Add a new scheduled task |
+| `claw-cron command` | Create a command-type task (supports interactive mode) |
 | `claw-cron list` | List all tasks |
 | `claw-cron delete <name>` | Delete a task |
 | `claw-cron run <name>` | Execute a task immediately |
 | `claw-cron log <name>` | View execution logs |
-| `claw-cron remind` | Create a reminder task |
+| `claw-cron remind` | Create a reminder (supports interactive mode) |
 | `claw-cron chat` | Natural language task management |
 | `claw-cron server` | Start scheduler service |
 | `claw-cron config` | Manage configuration |
@@ -120,6 +127,24 @@ claw-cron add --name weekly-report --cron "0 17 * * 5" \
     --type command --script "./generate-report.sh"
 ```
 
+### Interactive Command Creation
+
+```bash
+# Interactive mode - guided prompts
+claw-cron command
+
+# The wizard will guide you through:
+# 1. Task name
+# 2. Cron schedule (with preset options)
+# 3. Shell command
+# 4. Optional notification setup
+
+# Direct mode with notification
+claw-cron command --name health-check --cron "*/30 * * * *" \
+    --script "curl -s https://api.example.com/health" \
+    --channel qqbot --recipient me
+```
+
 ### AI Agent Tasks
 
 ```bash
@@ -139,6 +164,9 @@ claw-cron add --name monthly-review --cron "0 10 1 * *" \
 ### Reminders
 
 ```bash
+# Interactive reminder creation
+claw-cron remind
+
 # Daily standup reminder at 9am via iMessage
 claw-cron remind --name standup --cron "0 9 * * *" \
     --message "Daily standup meeting starting at {{ time }}" \
