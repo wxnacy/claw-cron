@@ -62,9 +62,9 @@
 
 **Plans:**
 - [x] 06-01-PLAN.md — Channel Infrastructure (Wave 1) ✅
-- [ ] 06-02-PLAN.md — iMessage Implementation (Wave 2)
+- [x] 06-02-PLAN.md — iMessage Implementation (Wave 2) ✅
 
-**Status:** 🔄 In Progress (2026-04-16)
+**Status:** ✅ Complete (2026-04-16)
 
 ---
 
@@ -73,6 +73,8 @@
 **Goal:** 实现 QQ Bot 消息通道，支持私聊和群聊通知。
 
 **Requirements:** QQ-01 ~ QQ-06
+
+**Plans:** 2 plans in 2 waves
 
 **Success Criteria:**
 1. `QQBotChannel` 可通过 QQ 开放平台 API 发送消息
@@ -84,8 +86,14 @@
 **UI hint**: no
 
 **Key Files:**
-- `src/claw_cron/channels/qq.py` — QQ Bot 实现
-- `pyproject.toml` — 添加 `aiohttp` 依赖（如尚未）
+- `src/claw_cron/channels/qqbot.py` — QQ Bot 实现
+- `pyproject.toml` — 添加 `tenacity` 依赖
+
+**Plans:**
+- [ ] 07-01-PLAN.md — QQ Bot Infrastructure + OAuth2 (Wave 1)
+- [ ] 07-02-PLAN.md — QQ Bot Message Sending (Wave 2)
+
+**Status:** 📋 Planned
 
 ---
 
@@ -136,7 +144,7 @@ dependencies = [
     "openai",           # OpenAI Provider
     "pydantic-settings", # AIConfig
     "macpymessenger>=0.2.0",  # iMessage (macOS only)
-    "aiohttp>=3.9.0",   # QQ Bot HTTP client
+    "tenacity",         # QQ Bot retry logic
 ]
 ```
 
@@ -145,7 +153,6 @@ dependencies = [
 ```toml
 [project.optional-dependencies]
 imessage = ["macpymessenger>=0.2.0"]  # macOS only
-qq = ["aiohttp>=3.9.0"]
 ```
 
 ---
