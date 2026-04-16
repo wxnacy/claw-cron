@@ -17,6 +17,8 @@ dependencies = [
     "rich",
     "pyyaml",
     "anthropic",
+    "openai",
+    "pydantic-settings",
 ]
 
 [project.scripts]
