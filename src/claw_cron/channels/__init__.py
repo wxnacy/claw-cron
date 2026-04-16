@@ -24,8 +24,69 @@ Usage:
         print("Message sent!")
 """
 
-# Will be populated after base.py is created
-__all__: list[str] = []
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from .base import ChannelConfig, MessageChannel, MessageResult
+from .exceptions import (
+    ChannelAuthError,
+    ChannelConfigError,
+    ChannelError,
+    ChannelNotAvailableError,
+    ChannelSendError,
+)
+
+__all__ = [
+    # Base classes
+    "MessageChannel",
+    "ChannelConfig",
+    "MessageResult",
+    # Exceptions
+    "ChannelError",
+    "ChannelAuthError",
+    "ChannelSendError",
+    "ChannelConfigError",
+    "ChannelNotAvailableError",
+    # Factory
+    "get_channel",
+    "CHANNEL_REGISTRY",
+]
+
 
 # Channel registry - populated by channel implementations
-CHANNEL_REGISTRY: dict[str, type] = {}
+# Each channel module should add itself: CHANNEL_REGISTRY["imessage"] = IMessageChannel
+CHANNEL_REGISTRY: dict[str, type[MessageChannel]] = {}
+
+
+def get_channel(
+    channel_id: str,
+    config: ChannelConfig | None = None,
+) -> MessageChannel:
+    """Factory function to create channel instances.
+
+    Args:
+        channel_id: Channel identifier ('imessage', 'qq', etc.)
+        config: Optional channel configuration.
+
+    Returns:
+        Channel instance implementing MessageChannel.
+
+    Raises:
+        ValueError: If channel_id is not registered.
+        ChannelNotAvailableError: If channel is not available on this platform.
+
+    Example:
+        >>> from claw_cron.channels import get_channel
+        >>> channel = get_channel("imessage")
+        >>> result = await channel.send_text("+8613812345678", "Hello!")
+    """
+    if channel_id not in CHANNEL_REGISTRY:
+        available = list(CHANNEL_REGISTRY.keys())
+        raise ValueError(
+            f"Unknown channel: {channel_id!r}. "
+            f"Available channels: {available if available else 'none registered yet'}"
+        )
+
+    channel_class = CHANNEL_REGISTRY[channel_id]
+    return channel_class(config=config)
