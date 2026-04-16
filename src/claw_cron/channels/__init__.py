@@ -90,3 +90,9 @@ def get_channel(
 
     channel_class = CHANNEL_REGISTRY[channel_id]
     return channel_class(config=config)
+
+
+# Import and register built-in channels
+from .imessage import IMessageChannel
+
+CHANNEL_REGISTRY["imessage"] = IMessageChannel
