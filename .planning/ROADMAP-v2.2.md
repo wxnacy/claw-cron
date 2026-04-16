@@ -10,9 +10,9 @@
 
 **Goal:** 使用 InquirerPy 统一交互式体验，为 remind 和新增的 command 命令提供交互式模式。
 
-**Requirements:** INTERACT-01 ~ INTERACT-06
+**Requirements:** INTERACT-01, INTERACT-02, INTERACT-03, INTERACT-04, INTERACT-05, INTERACT-06
 
-**Plans:** 2 plans in 2 waves
+**Plans:** 4 plans in 2 waves
 
 **Success Criteria:**
 1. `claw-cron remind` 无参数进入交互式模式
@@ -45,6 +45,15 @@
 |------|-----------|--------------|
 | 10-03 | remind 交互式模式 | INTERACT-02 |
 | 10-04 | command 命令实现 | INTERACT-03, INTERACT-06 |
+
+---
+
+## Plans
+
+- [ ] 10-01-PLAN.md — InquirerPy 集成 & 创建 prompt.py 交互模块
+- [ ] 10-02-PLAN.md — 替换现有 click.prompt/confirm 为 InquirerPy
+- [ ] 10-03-PLAN.md — remind 命令交互式模式实现
+- [ ] 10-04-PLAN.md — 新增 command 命令（直接+交互模式）
 
 ---
 
