@@ -12,6 +12,7 @@ from rich.console import Console
 
 from claw_cron.cmd.add import _add_direct
 from claw_cron.executor import execute_task
+from claw_cron.prompt import prompt_text
 from claw_cron.storage import delete_task, get_task, load_tasks, update_task
 
 console = Console()
@@ -191,7 +192,7 @@ def chat() -> None:
 
     while True:
         try:
-            user_input = click.prompt("You")
+            user_input = prompt_text("You")
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Bye.[/dim]")
             break
