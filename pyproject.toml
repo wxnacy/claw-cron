@@ -19,6 +19,7 @@ dependencies = [
     "anthropic",
     "openai",
     "pydantic-settings",
+    "macpymessenger>=0.2.0",
 ]
 
 [project.scripts]
