@@ -117,3 +117,19 @@ Plan 02 will implement:
 - IMSG-02: Add `macpymessenger` dependency
 - IMSG-03: `+86` international number format support
 - IMSG-04: First-run permission request prompt
+
+---
+
+## Self-Check: PASSED
+
+**Files Created:**
+- ✅ src/claw_cron/channels/__init__.py
+- ✅ src/claw_cron/channels/base.py
+- ✅ src/claw_cron/channels/exceptions.py
+- ✅ .planning/phases/06-message-channels-imessage/06-01-SUMMARY.md
+
+**Commits Verified:**
+- ✅ ed42a0a: Create channel module structure and exceptions
+- ✅ 2bd286c: Implement MessageChannel abstract class
+- ✅ 96b5917: Implement channel factory and registry
+- ✅ 098063b: Complete channel infrastructure plan (docs)
