@@ -16,20 +16,20 @@
 
 ### AI Provider 重构
 
-- [ ] **PROV-01**: 重构 `agent.py` 为 Provider 模式，支持多 AI 提供商
+- [x] **PROV-01**: 重构 `agent.py` 为 Provider 模式，支持多 AI 提供商
 - [x] **PROV-02**: 实现 `BaseProvider` 抽象基类，包含 `chat_with_tools()` 方法
-- [ ] **PROV-03**: 实现 `AnthropicProvider`，迁移现有 Anthropic 逻辑并支持 Tool Use
-- [ ] **PROV-04**: 实现 `OpenAIProvider`，支持 OpenAI API 和 Tool Use
+- [x] **PROV-03**: 实现 `AnthropicProvider`，迁移现有 Anthropic 逻辑并支持 Tool Use
+- [x] **PROV-04**: 实现 `OpenAIProvider`，支持 OpenAI API 和 Tool Use
 - [x] **PROV-05**: 添加 `AIConfig` 配置类，支持 `provider`、`model`、`api_key`、`base_url` 参数
 - [x] **PROV-06**: 支持环境变量配置 (`CLAW_CRON_API_KEY`, `CLAW_CRON_MODEL`, `CLAW_CRON_PROVIDER`)
-- [ ] **PROV-07**: Provider 工厂函数 `get_provider()` 自动选择实现
+- [x] **PROV-07**: Provider 工厂函数 `get_provider()` 自动选择实现
 
 ### Tool Use 支持
 
 - [x] **TOOL-01**: 定义中性格式的 `ToolDefinition` 数据类
 - [x] **TOOL-02**: 定义 `ToolCall` 数据类，统一 Anthropic 和 OpenAI 的调用结果
 - [x] **TOOL-03**: 实现 Tool 格式转换器 (`to_anthropic_tool`, `to_openai_tool`)
-- [ ] **TOOL-04**: 保持现有 `create_task` Tool 功能正常工作
+- [x] **TOOL-04**: 保持现有 `create_task` Tool 功能正常工作
 
 ### 消息通道基础设施
 
@@ -86,17 +86,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 5 | Pending |
+| PROV-01 | Phase 5 | ✅ Complete (05-02) |
 | PROV-02 | Phase 5 | ✅ Complete (05-01) |
-| PROV-03 | Phase 5 | Pending |
-| PROV-04 | Phase 5 | Pending |
+| PROV-03 | Phase 5 | ✅ Complete (05-02) |
+| PROV-04 | Phase 5 | ✅ Complete (05-02) |
 | PROV-05 | Phase 5 | ✅ Complete (05-01) |
 | PROV-06 | Phase 5 | ✅ Complete (05-01) |
-| PROV-07 | Phase 5 | Pending |
+| PROV-07 | Phase 5 | ✅ Complete (05-02) |
 | TOOL-01 | Phase 5 | ✅ Complete (05-01) |
 | TOOL-02 | Phase 5 | ✅ Complete (05-01) |
 | TOOL-03 | Phase 5 | ✅ Complete (05-01) |
-| TOOL-04 | Phase 5 | Pending |
+| TOOL-04 | Phase 5 | ✅ Complete (05-02) |
 | CHAN-01 | Phase 6 | Pending |
 | CHAN-02 | Phase 6 | Pending |
 | CHAN-03 | Phase 6 | Pending |
