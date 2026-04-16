@@ -61,8 +61,10 @@
 - `pyproject.toml` — 添加 `macpymessenger` 依赖
 
 **Plans:**
-- [ ] 06-01-PLAN.md — Channel Infrastructure (Wave 1)
+- [x] 06-01-PLAN.md — Channel Infrastructure (Wave 1) ✅
 - [ ] 06-02-PLAN.md — iMessage Implementation (Wave 2)
+
+**Status:** 🔄 In Progress (2026-04-16)
 
 ---
 
