@@ -18,12 +18,20 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
   - 执行引擎 & Chat (Phase 3)
   - 调度服务 (Phase 4)
 
-### Active (v2.0)
+### Active (v2.1)
 
-- [ ] AI Provider 重构：支持 Anthropic 和 OpenAI 双提供商
-- [ ] 消息通道：支持 iMessage 和 QQ 通知
-- [ ] 任务通知：任务执行完成后自动发送通知
-- [ ] 定时提醒：新增 `remind` 命令创建纯提醒任务
+- [ ] 通道管理命令：`channels add/delete/list` 管理消息通道配置
+- [ ] WebSocket 连接：QQ Bot WebSocket 客户端，接收消息事件
+- [ ] OpenID 捕获：自动捕获用户 openid 并存储为联系人
+- [ ] 联系人别名：`remind` 命令支持使用别名作为 recipient
+
+### Validated
+
+- ✅ **v2.0 里程碑已完成** (2026-04-16)
+  - AI Provider 重构 (Phase 5)
+  - 消息通道基础 + iMessage (Phase 6)
+  - QQ 通道 (Phase 7)
+  - 任务通知 + 定时提醒 (Phase 8)
 
 ### Out of Scope
 
