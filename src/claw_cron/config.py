@@ -44,6 +44,20 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
+def save_config(config: dict[str, Any], path: Path = CONFIG_FILE) -> None:
+    """Save config to YAML file.
+
+    Creates parent directories if needed.
+
+    Args:
+        config: Config dict to save.
+        path: Path to config.yaml.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+
+
 def get_client_cmd(client: str, path: Path = CONFIG_FILE) -> str:
     """Resolve the command template for an AI client.
 
