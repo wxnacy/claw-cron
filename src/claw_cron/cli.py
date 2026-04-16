@@ -11,6 +11,7 @@ from claw_cron.cmd.delete import delete
 from claw_cron.cmd.list import list_tasks
 from claw_cron.cmd.log import log
 from claw_cron.cmd.run import run
+from claw_cron.cmd.server import server
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -26,3 +27,4 @@ cli.add_command(delete)
 cli.add_command(run)
 cli.add_command(log)
 cli.add_command(chat)
+cli.add_command(server)
