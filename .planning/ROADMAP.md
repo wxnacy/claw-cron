@@ -44,6 +44,8 @@
 
 **Requirements:** CHAN-01 ~ CHAN-04, IMSG-01 ~ IMSG-04
 
+**Plans:** 2 plans in 2 waves
+
 **Success Criteria:**
 1. `MessageChannel` 基类可被继承扩展
 2. `IMessageChannel` 可在 macOS 上发送 iMessage
@@ -57,6 +59,10 @@
 - `src/claw_cron/channels/base.py` — MessageChannel 抽象类
 - `src/claw_cron/channels/imessage.py` — iMessage 实现
 - `pyproject.toml` — 添加 `macpymessenger` 依赖
+
+**Plans:**
+- [ ] 06-01-PLAN.md — Channel Infrastructure (Wave 1)
+- [ ] 06-02-PLAN.md — iMessage Implementation (Wave 2)
 
 ---
 
