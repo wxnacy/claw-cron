@@ -1,0 +1,13 @@
+{
+    "reportAssignmentType": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportArgumentType": "none",
+    "reportCallIssue": "none",
+    "reportOptionalCall": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportGeneralTypeIssues": "none",
+    "reportReturnType": "none",
+    "reportInvalidTypeForm": "none",
+    "venvPath": "",
+    "venv": ""
+}
