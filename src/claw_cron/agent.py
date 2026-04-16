@@ -12,6 +12,7 @@ import click
 from rich.console import Console
 
 from claw_cron.config import AIConfig, load_ai_config
+from claw_cron.prompt import prompt_select, prompt_text
 from claw_cron.providers import (
     BaseProvider,
     ToolDefinition,
@@ -121,9 +122,9 @@ def run_ai_add(
             # Ask for AI client if agent type and not specified
             resolved_client = task_input.get("client") or client
             if task_input.get("type") == "agent" and not resolved_client:
-                resolved_client = click.prompt(
+                resolved_client = prompt_select(
                     "Select AI client",
-                    type=click.Choice(["kiro-cli", "codebuddy", "opencode"]),
+                    choices=["kiro-cli", "codebuddy", "opencode"],
                     default="kiro-cli",
                 )
 
@@ -153,7 +154,7 @@ def run_ai_add(
         messages.append({"role": "assistant", "content": result.content})
 
         # Get user input
-        user_reply = click.prompt("\nYou")
+        user_reply = prompt_text("\nYou")
         messages.append({"role": "user", "content": user_reply})
 
 
