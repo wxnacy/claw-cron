@@ -103,6 +103,8 @@
 
 **Requirements:** NOTIF-01 ~ NOTIF-05, REMIND-01 ~ REMIND-03
 
+**Plans:** 2 plans in 2 waves
+
 **Success Criteria:**
 1. 任务 YAML 可配置 `notify.channel` 和 `notify.recipients`
 2. 任务执行完成后自动发送通知
@@ -116,6 +118,12 @@
 - `src/claw_cron/notifier.py` — 通知发送逻辑
 - `src/claw_cron/cmd/remind.py` — remind 命令
 - `src/claw_cron/executor.py` — 集成通知调用
+
+**Plans:**
+- [ ] 08-01-PLAN.md — Task Notification Integration (Wave 1)
+- [ ] 08-02-PLAN.md — Reminder Command (Wave 2)
+
+**Status:** 📋 Planned
 
 ---
 

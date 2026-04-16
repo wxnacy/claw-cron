@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Multi-Provider + Message Channels
-status: planning
-last_updated: "2026-04-16T18:30:00.000Z"
+status: complete
+last_updated: "2026-04-16T21:00:00.000Z"
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 4
-  percent: 50
+  completed_phases: 4
+  total_plans: 8
+  completed_plans: 8
+  percent: 100
 ---
 
 # Project State: claw-cron
@@ -19,13 +19,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Current focus:** Phase 7 — QQ Channel Implementation
+**Current focus:** Phase 8 Complete — v2.0 Ready
 
 ## Current Status
 
-**Phase:** 07
-**Plan:** Complete
-**Status:** Phase 7 Complete — QQ Bot Channel Ready for Use
+**Phase:** 08
+**Plan:** All Complete
+**Status:** Phase 8 Complete — Notification Integration & Reminders
 
 ## Phase Progress
 
@@ -38,7 +38,7 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 | 5 | AI Provider Refactor | ✅ Complete (v2.0) |
 | 6 | Message Channels + iMessage | ✅ Complete (v2.0) |
 | 7 | QQ Channel | ✅ Complete (v2.0) |
-| 8 | Task Notification + Reminders | 📋 Pending |
+| 8 | Task Notification + Reminders | ✅ Complete (v2.0) |
 
 ## Phase 5 Plans
 
@@ -60,6 +60,13 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 |------|-----------|------|-------|--------|
 | 07-01 | QQ Bot Infrastructure + OAuth2 | 1 | 3 | ✅ Complete |
 | 07-02 | QQ Bot Message Sending | 2 | 3 | ✅ Complete |
+
+## Phase 8 Plans
+
+| Plan | Objective | Wave | Tasks | Status |
+|------|-----------|------|-------|--------|
+| 08-01 | Task Notification Integration | 1 | 4 | ✅ Complete |
+| 08-02 | Reminder Command | 2 | 4 | ✅ Complete |
 
 ## Requirements Coverage
 
@@ -90,15 +97,20 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 | QQ-04 | 07-02 Task 1 | ✅ Complete |
 | QQ-05 | 07-02 Task 1-2 | ✅ Complete |
 | QQ-06 | 07-02 Task 3 | ✅ Complete |
+| NOTIF-01 | 08-01 Task 1 | ✅ Complete |
+| NOTIF-02 | 08-01 Task 1 | ✅ Complete |
+| NOTIF-03 | 08-01 Task 2-3 | ✅ Complete |
+| NOTIF-04 | 08-01 Task 4 | ✅ Complete |
+| NOTIF-05 | 08-01 Task 2 | ✅ Complete |
+| REMIND-01 | 08-02 Task 3 | ✅ Complete |
+| REMIND-02 | 08-02 Task 1-2 | ✅ Complete |
+| REMIND-03 | 08-02 Task 2 | ✅ Complete |
 
 ## Next Action
 
-Phase 7 complete. QQ Bot channel is ready for use.
+**v2.0 Milestone Complete!**
 
-To test QQ Bot messaging:
-1. Set environment variables: `CLAW_CRON_QQBOT_APP_ID` and `CLAW_CRON_QQBOT_CLIENT_SECRET`
-2. Use `get_channel("qqbot")` to get channel instance
-3. Send messages with `send_text("c2c:OPENID", "Hello!")`
+All phases complete. Ready for release.
 
 ---
 
@@ -112,6 +124,8 @@ To test QQ Bot messaging:
 | 06-02 | 3m | 3 | 3 | 2026-04-16 |
 | 07-01 | 3m | 3 | 3 | 2026-04-16 |
 | 07-02 | 2m | 3 | 1 | 2026-04-16 |
+| 08-01 | 3m | 4 | 5 | 2026-04-16 |
+| 08-02 | 2m | 4 | 3 | 2026-04-16 |
 
 ---
 
@@ -124,10 +138,29 @@ To test QQ Bot messaging:
 - **2026-04-16**: Use httpx for QQ Bot API (already installed v0.28.1)
 - **2026-04-16**: Use tenacity for retry logic with exponential backoff
 - **2026-04-16**: Token caching with 60s buffer before expiration
+- **2026-04-16**: Notification errors don't affect task exit code
+- **2026-04-16**: Template variables rendered at execution time
 
 ---
 
 ## Session Log
+
+**2026-04-16T21:00:00Z** — Completed Phase 8 (Task Notification + Reminders)
+- Implemented NotifyConfig and extended Task model
+- Implemented Notifier class with async notification
+- Integrated notification into executor
+- Added config channels command
+- Implemented remind command
+- Added reminder task type support
+- All NOTIF and REMIND requirements complete
+- v2.0 milestone complete!
+
+**2026-04-16T20:00:00Z** — Planned Phase 8 (Task Notification + Reminders)
+- Created 2 plans in 2 waves
+- 08-01: Task Notification Integration (4 tasks)
+- 08-02: Reminder Command (4 tasks)
+- All 8 requirements (NOTIF-01~05, REMIND-01~03) mapped
+- Verification: PASS
 
 **2026-04-16T19:50:00Z** — Completed Phase 7 (QQ Bot Channel)
 - 1 commit: e79fc5a
@@ -196,3 +229,8 @@ To test QQ Bot messaging:
 *Phase 7 Plan 01 completed: 2026-04-16T19:50:00Z*
 *Phase 7 Plan 02 completed: 2026-04-16T19:50:00Z*
 *Phase 7 completed: 2026-04-16T19:50:00Z*
+*Phase 8 planned: 2026-04-16T20:00:00Z*
+*Phase 8 Plan 01 completed: 2026-04-16T21:00:00Z*
+*Phase 8 Plan 02 completed: 2026-04-16T21:00:00Z*
+*Phase 8 completed: 2026-04-16T21:00:00Z*
+*v2.0 complete: 2026-04-16T21:00:00Z*

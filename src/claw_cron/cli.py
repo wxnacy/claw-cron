@@ -7,9 +7,11 @@ import click
 from claw_cron.__about__ import __version__
 from claw_cron.cmd.add import add
 from claw_cron.cmd.chat import chat
+from claw_cron.cmd.config import config
 from claw_cron.cmd.delete import delete
 from claw_cron.cmd.list import list_tasks
 from claw_cron.cmd.log import log
+from claw_cron.cmd.remind import remind
 from claw_cron.cmd.run import run
 from claw_cron.cmd.server import server
 
@@ -28,3 +30,5 @@ cli.add_command(run)
 cli.add_command(log)
 cli.add_command(chat)
 cli.add_command(server)
+cli.add_command(config)
+cli.add_command(remind)

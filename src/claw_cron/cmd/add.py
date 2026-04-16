@@ -19,7 +19,7 @@ console = Console()
     "--type",
     "task_type",
     default=None,
-    type=click.Choice(["command", "agent"]),
+    type=click.Choice(["command", "agent", "reminder"]),
     help="Execution type",
 )
 @click.option("--script", default=None, help="Shell command to run (command type)")
@@ -67,6 +67,24 @@ def _add_direct(
         raise click.UsageError("--script is required for command type tasks")
     if task_type == "agent" and not ai_prompt:
         raise click.UsageError("--prompt is required for agent type tasks")
+    if task_type == "reminder":
+        if not ai_prompt:
+            raise click.UsageError(
+                "--prompt is required for reminder type tasks (used as message)"
+            )
+        # Use prompt as message for reminder
+        task = Task(
+            name=name,
+            cron=cron,
+            type=task_type,
+            message=ai_prompt,
+        )
+        add_task(task)
+        console.print(f"[green]Reminder '{name}' added.[/green]")
+        console.print(
+            "[yellow]Note: Edit tasks.yaml to add notification config.[/yellow]"
+        )
+        return
 
     task = Task(
         name=name,

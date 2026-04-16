@@ -33,17 +33,17 @@
 
 ### 消息通道基础设施
 
-- [ ] **CHAN-01**: 实现 `MessageChannel` 抽象基类
-- [ ] **CHAN-02**: 实现 `ChannelConfig` 配置基类
-- [ ] **CHAN-03**: 实现 `MessageResult` 结果数据类
-- [ ] **CHAN-04**: 实现 `get_channel()` 工厂函数和 `CHANNEL_REGISTRY`
+- [x] **CHAN-01**: 实现 `MessageChannel` 抽象基类
+- [x] **CHAN-02**: 实现 `ChannelConfig` 配置基类
+- [x] **CHAN-03**: 实现 `MessageResult` 结果数据类
+- [x] **CHAN-04**: 实现 `get_channel()` 工厂函数和 `CHANNEL_REGISTRY`
 
 ### iMessage 通道
 
-- [ ] **IMSG-01**: 添加 `macpymessenger` 依赖
-- [ ] **IMSG-02**: 实现 `IMessageChannel` 类，支持发送文本消息
-- [ ] **IMSG-03**: 实现 `IMessageConfig` 配置类（无需额外参数）
-- [ ] **IMSG-04**: 支持国际电话号码格式 (`+86...`)
+- [x] **IMSG-01**: 添加 `macpymessenger` 依赖
+- [x] **IMSG-02**: 实现 `IMessageChannel` 类，支持发送文本消息
+- [x] **IMSG-03**: 实现 `IMessageConfig` 配置类（无需额外参数）
+- [x] **IMSG-04**: 支持国际电话号码格式 (`+86...`)
 
 ### QQ 通道
 
@@ -97,14 +97,14 @@
 | TOOL-02 | Phase 5 | ✅ Complete (05-01) |
 | TOOL-03 | Phase 5 | ✅ Complete (05-01) |
 | TOOL-04 | Phase 5 | ✅ Complete (05-02) |
-| CHAN-01 | Phase 6 | Pending |
-| CHAN-02 | Phase 6 | Pending |
-| CHAN-03 | Phase 6 | Pending |
-| CHAN-04 | Phase 6 | Pending |
-| IMSG-01 | Phase 6 | Pending |
-| IMSG-02 | Phase 6 | Pending |
-| IMSG-03 | Phase 6 | Pending |
-| IMSG-04 | Phase 6 | Pending |
+| CHAN-01 | Phase 6 | ✅ Complete (06-01) |
+| CHAN-02 | Phase 6 | ✅ Complete (06-01) |
+| CHAN-03 | Phase 6 | ✅ Complete (06-01) |
+| CHAN-04 | Phase 6 | ✅ Complete (06-01) |
+| IMSG-01 | Phase 6 | ✅ Complete (06-02) |
+| IMSG-02 | Phase 6 | ✅ Complete (06-02) |
+| IMSG-03 | Phase 6 | ✅ Complete (06-02) |
+| IMSG-04 | Phase 6 | ✅ Complete (06-02) |
 | QQ-01 | Phase 7 | Pending |
 | QQ-02 | Phase 7 | Pending |
 | QQ-03 | Phase 7 | Pending |

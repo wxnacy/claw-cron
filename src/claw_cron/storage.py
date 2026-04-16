@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
+
+if TYPE_CHECKING:
+    from claw_cron.notifier import NotifyConfig
 
 TASKS_FILE = Path.home() / ".config" / "claw-cron" / "tasks.yaml"
 
@@ -22,12 +25,14 @@ class Task:
     Attributes:
         name: Unique task identifier.
         cron: Standard 5-field cron expression (min hour day month weekday).
-        type: Execution type — "command" or "agent".
+        type: Execution type — "command", "agent", or "reminder".
         script: Shell command to run (command type).
         prompt: AI prompt to send (agent type).
         client: AI client to use — "kiro-cli", "codebuddy", or "opencode" (agent type).
         client_cmd: Full command template override for this task (highest priority, overrides config.yaml and built-in defaults). Use {prompt} as placeholder.
         enabled: Whether the task is active. Defaults to True.
+        notify: Notification configuration. Optional.
+        message: Message for reminder type tasks. Optional.
     """
 
     name: str
@@ -38,6 +43,8 @@ class Task:
     client: str | None = None
     client_cmd: str | None = None
     enabled: bool = field(default=True)
+    notify: NotifyConfig | None = None
+    message: str | None = None
 
 
 def _load_raw(path: Path = TASKS_FILE) -> list[dict[str, Any]]:
@@ -49,6 +56,16 @@ def _load_raw(path: Path = TASKS_FILE) -> list[dict[str, Any]]:
     return data.get("tasks", [])
 
 
+def _task_from_dict(raw: dict[str, Any]) -> Task:
+    """Create Task from raw dict, handling nested NotifyConfig."""
+    # Handle notify field conversion
+    if "notify" in raw and isinstance(raw["notify"], dict):
+        from claw_cron.notifier import NotifyConfig
+
+        raw["notify"] = NotifyConfig.from_dict(raw["notify"])
+    return Task(**raw)
+
+
 def load_tasks(path: Path = TASKS_FILE) -> list[Task]:
     """Load all tasks from the YAML file.
 
@@ -58,7 +75,7 @@ def load_tasks(path: Path = TASKS_FILE) -> list[Task]:
     Returns:
         List of Task objects. Empty list if file doesn't exist.
     """
-    return [Task(**raw) for raw in _load_raw(path)]
+    return [_task_from_dict(raw) for raw in _load_raw(path)]
 
 
 def save_tasks(tasks: list[Task], path: Path = TASKS_FILE) -> None:
