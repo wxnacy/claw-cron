@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Channel Management Commands
-status: in_progress
-last_updated: "2026-04-16T15:25:00.000Z"
+status: complete
+last_updated: "2026-04-16T15:35:00.000Z"
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 50
+  completed_plans: 2
+  percent: 100
 ---
 
 # Project State: claw-cron
@@ -19,26 +19,26 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Current focus:** Phase 9 — Channel Management Commands
+**Current focus:** Phase 9 — Channel Management Commands (Complete)
 
 ## Current Status
 
 **Phase:** 09
 **Plan:** 09-02 (WebSocket & OpenID Capture)
-**Status:** In Progress
+**Status:** Complete
 
 ## Phase Progress (v2.1)
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 9 | Channel Management Commands | In Progress |
+| 9 | Channel Management Commands | Complete |
 
 ## Phase 9 Plans
 
 | Plan | Objective | Wave | Tasks | Status |
 |------|-----------|------|-------|--------|
 | 09-01 | Channels Command & Configuration | 1 | 6 | Complete |
-| 09-02 | WebSocket & OpenID Capture | 2 | 6 | Ready |
+| 09-02 | WebSocket & OpenID Capture | 2 | 6 | Complete |
 
 ## Requirements Coverage (v2.1)
 
@@ -46,15 +46,15 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 |-------------|------|--------|
 | CHAN-MGMT-01 | 09-01 | Complete |
 | CHAN-MGMT-02 | 09-01 | Complete |
-| CHAN-MGMT-03 | 09-02 | Planned |
-| CHAN-MGMT-04 | 09-02 | Planned |
+| CHAN-MGMT-03 | 09-02 | Complete |
+| CHAN-MGMT-04 | 09-02 | Complete |
 | CHAN-MGMT-05 | 09-01 | Complete |
 | CHAN-MGMT-06 | 09-01 | Complete |
-| CHAN-MGMT-07 | 09-02 | Planned |
+| CHAN-MGMT-07 | 09-02 | Complete |
 
 ## Next Action
 
-**Run `/gsd:execute-phase 9` to continue with Plan 09-02.**
+**Milestone v2.1 Complete.** All requirements satisfied.
 
 ---
 
@@ -75,8 +75,9 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 - **2026-04-16**: Use WebSocket to capture user openid (follows OpenClaw pattern)
 - **2026-04-16**: Store contacts with aliases for easier remind command usage
 - **2026-04-16**: Interactive CLI for channel configuration (better UX than manual config file editing)
-- **2026-04-16**: websockets library for WebSocket client (v16.0, already installed)
+- **2026-04-16**: websockets library for WebSocket client (v16.0, installed during execution)
 - **2026-04-16**: Click prompt for interactive input, Rich for status display
+- **2026-04-16**: Use websockets.asyncio.client API (not deprecated legacy)
 
 ---
 
@@ -103,7 +104,18 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 - Credential validation via QQ Bot API
 - All CHAN-MGMT-01, 02, 05, 06 requirements complete
 
+**2026-04-16T15:35:00Z** — Plan 09-02 Execution
+- Created qqbot module with events and websocket submodules
+- Implemented TDD approach for event parsing (9 tests)
+- Implemented WebSocket client with heartbeat/reconnection
+- Added capture command to channels
+- Integrated contact alias in remind command
+- Updated channels add --capture-openid flag
+- All CHAN-MGMT-03, 04, 07 requirements complete
+- Milestone v2.1 complete
+
 ---
 
 *Initialized: 2026-04-16*
 *Planning completed: 2026-04-16T23:00:00Z*
+*Milestone v2.1 completed: 2026-04-16T15:35:00Z*
