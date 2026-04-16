@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Type checking
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Distribution
+*.tar.gz
+
+# Logs
+*.log
+*.log.*
+
+# macOS
+.DS_Store
+
+# AI Agents
+.cursor/
+.agents/
+.kiro/
+.codebuddy/
+.claude/
+.qwen/
+.iflow/
+.workbuddy/
