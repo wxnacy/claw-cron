@@ -58,7 +58,7 @@ def channels() -> None:
     "--capture-openid",
     is_flag=True,
     default=False,
-    help="Connect WebSocket to capture user openid (Phase 2)",
+    help="Connect WebSocket to capture user openid after configuration",
 )
 def add(channel_type: str, app_id: str, client_secret: str, capture_openid: bool) -> None:
     """Add a new message channel configuration.
@@ -99,8 +99,8 @@ def add(channel_type: str, app_id: str, client_secret: str, capture_openid: bool
 
     # Handle capture_openid flag
     if capture_openid:
-        console.print("[yellow]Note: OpenID capture requires WebSocket connection (Phase 2)[/yellow]")
-        console.print("[dim]Run 'claw-cron channels capture' after Phase 2 implementation[/dim]")
+        console.print("\n[bold]Step 2: Capture User OpenID[/bold]\n")
+        asyncio.run(_capture_qqbot_openid(alias="me"))
 
 
 @channels.command("list")
