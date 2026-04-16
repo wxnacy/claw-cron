@@ -1,121 +1,93 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Channel Management Commands
-status: complete
-last_updated: "2026-04-16T15:35:00.000Z"
+milestone: v2.2
+milestone_name: Interactive Commands
+status: planning
+last_updated: "2026-04-17T01:50:00.000Z"
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: claw-cron
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-16)
+See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Current focus:** Phase 9 — Channel Management Commands (Complete)
+**Current focus:** Phase 10 — Interactive Commands
 
 ## Current Status
 
-**Phase:** 09
-**Plan:** 09-02 (WebSocket & OpenID Capture)
-**Status:** Complete
+**Phase:** 10
+**Plan:** Not started
+**Status:** Planning
 
-## Phase Progress (v2.1)
+## Phase Progress (v2.2)
+
+| Phase | Name | Status |
+|-------|------|--------|
+| 10 | Interactive Commands | Planning |
+
+## Phase 10 Plans
+
+| Plan | Objective | Wave | Tasks | Status |
+|------|-----------|------|-------|--------|
+| 10-01 | InquirerPy 集成 & prompt 模块 | 1 | TBD | Pending |
+| 10-02 | 替换现有交互式调用 | 1 | TBD | Pending |
+| 10-03 | remind 交互式模式 | 2 | TBD | Pending |
+| 10-04 | command 命令实现 | 2 | TBD | Pending |
+
+## Requirements Coverage (v2.2)
+
+| Requirement | Plan | Status |
+|-------------|------|--------|
+| INTERACT-01 | 10-01 | Pending |
+| INTERACT-02 | 10-03 | Pending |
+| INTERACT-03 | 10-04 | Pending |
+| INTERACT-04 | 10-02 | Pending |
+| INTERACT-05 | 10-01 | Pending |
+| INTERACT-06 | 10-04 | Pending |
+
+## Next Action
+
+Run `/gsd-plan-phase 10` to start planning Phase 10.
+
+---
+
+## Previous Milestone (v2.1) Summary
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 9 | Channel Management Commands | Complete |
 
-## Phase 9 Plans
-
-| Plan | Objective | Wave | Tasks | Status |
-|------|-----------|------|-------|--------|
-| 09-01 | Channels Command & Configuration | 1 | 6 | Complete |
-| 09-02 | WebSocket & OpenID Capture | 2 | 6 | Complete |
-
-## Requirements Coverage (v2.1)
-
-| Requirement | Plan | Status |
-|-------------|------|--------|
-| CHAN-MGMT-01 | 09-01 | Complete |
-| CHAN-MGMT-02 | 09-01 | Complete |
-| CHAN-MGMT-03 | 09-02 | Complete |
-| CHAN-MGMT-04 | 09-02 | Complete |
-| CHAN-MGMT-05 | 09-01 | Complete |
-| CHAN-MGMT-06 | 09-01 | Complete |
-| CHAN-MGMT-07 | 09-02 | Complete |
-
-## Next Action
-
-**Milestone v2.1 Complete.** All requirements satisfied.
-
----
-
-## Previous Milestone (v2.0) Summary
-
-| Phase | Name | Status |
-|-------|------|--------|
-| 5 | AI Provider Refactor | Complete |
-| 6 | Message Channels + iMessage | Complete |
-| 7 | QQ Channel | Complete |
-| 8 | Task Notification + Reminders | Complete |
+All CHAN-MGMT-01~07 requirements completed.
 
 ---
 
 ## Decisions
 
-- **2026-04-16**: v2.1 milestone focuses on simplifying QQ channel configuration
-- **2026-04-16**: Use WebSocket to capture user openid (follows OpenClaw pattern)
-- **2026-04-16**: Store contacts with aliases for easier remind command usage
-- **2026-04-16**: Interactive CLI for channel configuration (better UX than manual config file editing)
-- **2026-04-16**: websockets library for WebSocket client (v16.0, installed during execution)
-- **2026-04-16**: Click prompt for interactive input, Rich for status display
-- **2026-04-16**: Use websockets.asyncio.client API (not deprecated legacy)
+- **2026-04-17**: v2.2 milestone focuses on interactive CLI improvements
+- **2026-04-17**: Use InquirerPy (not python-inquirer) for richer interaction types
+- **2026-04-17**: New `command` command for creating command-type tasks
+- **2026-04-17**: Both `remind` and `command` support direct + interactive modes
+- **2026-04-17**: Cron presets to lower learning barrier
 
 ---
 
 ## Session Log
 
-**2026-04-16T22:00:00Z** — Milestone v2.1 Planning
-- Researched OpenClaw QQ Bot integration flow
-- Researched QQ open platform WebSocket API
-- Created 7 requirements (CHAN-MGMT-01~07)
-- Created roadmap with 2 plans in 2 waves
-- Updated PROJECT.md with v2.1 goals
-
-**2026-04-16T23:00:00Z** — Phase 9 Planning
-- Created detailed 09-01-PLAN.md (Channels Command & Configuration)
-- Created detailed 09-02-PLAN.md (WebSocket & OpenID Capture)
-- Updated ROADMAP.md with Phase 9 details
-- All 7 requirements mapped to plans
-
-**2026-04-16T15:25:00Z** — Plan 09-01 Execution
-- Implemented contacts.py module with TDD (9 tests)
-- Implemented channels command group (add/list/delete)
-- Implemented contacts subcommands (list/delete)
-- Added save_config function to config.py
-- Credential validation via QQ Bot API
-- All CHAN-MGMT-01, 02, 05, 06 requirements complete
-
-**2026-04-16T15:35:00Z** — Plan 09-02 Execution
-- Created qqbot module with events and websocket submodules
-- Implemented TDD approach for event parsing (9 tests)
-- Implemented WebSocket client with heartbeat/reconnection
-- Added capture command to channels
-- Integrated contact alias in remind command
-- Updated channels add --capture-openid flag
-- All CHAN-MGMT-03, 04, 07 requirements complete
-- Milestone v2.1 complete
+**2026-04-17T01:50:00Z** — Milestone v2.2 Planning
+- Researched Python interactive CLI libraries
+- Compared InquirerPy vs python-inquirer
+- Created 6 requirements (INTERACT-01~06)
+- Created roadmap with 4 plans in 2 waves
+- Updated PROJECT.md with v2.2 goals
 
 ---
 
-*Initialized: 2026-04-16*
-*Planning completed: 2026-04-16T23:00:00Z*
-*Milestone v2.1 completed: 2026-04-16T15:35:00Z*
+*Initialized: 2026-04-17*
