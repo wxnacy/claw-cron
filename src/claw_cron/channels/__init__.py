@@ -51,6 +51,9 @@ __all__ = [
     # Factory
     "get_channel",
     "CHANNEL_REGISTRY",
+    # Channel implementations
+    "IMessageChannel",
+    "QQBotChannel",
 ]
 
 
@@ -94,5 +97,7 @@ def get_channel(
 
 # Import and register built-in channels
 from .imessage import IMessageChannel
+from .qqbot import QQBotChannel
 
 CHANNEL_REGISTRY["imessage"] = IMessageChannel
+CHANNEL_REGISTRY["qqbot"] = QQBotChannel
