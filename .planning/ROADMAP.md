@@ -151,10 +151,10 @@
 - `src/claw_cron/qqbot/events.py` — 事件类型定义
 
 **Plans:**
-- [ ] 09-01-PLAN.md — Channels Command & Configuration (Wave 1)
-- [ ] 09-02-PLAN.md — WebSocket & OpenID Capture (Wave 2)
+- [x] 09-01-PLAN.md — Channels Command & Configuration (Wave 1) ✅
+- [x] 09-02-PLAN.md — WebSocket & OpenID Capture (Wave 2) ✅
 
-**Status:** 📋 Planned
+**Status:** ✅ Complete (2026-04-16)
 
 ---
 
