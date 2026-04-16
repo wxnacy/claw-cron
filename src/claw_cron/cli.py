@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 
+import logging
+
 import click
 
 from claw_cron.__about__ import __version__
@@ -21,7 +23,12 @@ from claw_cron.cmd.server import server
 @click.version_option(__version__, "-v", "--version")
 def cli() -> None:
     """claw-cron: AI-powered cron task manager."""
-    pass
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 cli.add_command(add)

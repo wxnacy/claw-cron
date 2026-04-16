@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from claw_cron.executor import LOGS_DIR, execute_task
+from claw_cron.executor import LOGS_DIR, run_task_with_notify
 from claw_cron.storage import load_tasks
 
 SYSTEM_LOG = LOGS_DIR / "claw-cron.log"
@@ -103,7 +103,7 @@ def run_scheduler(stop_event: threading.Event, foreground: bool = True) -> None:
             try:
                 if cron_matches(task.cron, now):
                     log(f"Triggered: {task.name} ({task.cron})")
-                    t = threading.Thread(target=execute_task, args=(task,), daemon=True)
+                    t = threading.Thread(target=run_task_with_notify, args=(task,), daemon=True)
                     t.start()
             except ValueError as e:
                 log(f"Invalid cron for task '{task.name}': {e}")

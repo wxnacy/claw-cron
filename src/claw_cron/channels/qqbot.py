@@ -228,13 +228,20 @@ class QQBotChannel(MessageChannel):
     # Markdown not allowed error code
     MARKDOWN_NOT_ALLOWED_CODE = 50056
 
-    def __init__(self, config: QQBotConfig | None = None) -> None:
+    def __init__(self, config: QQBotConfig | dict | None = None) -> None:
         """Initialize QQ Bot channel.
 
         Args:
-            config: QQ Bot configuration. Uses defaults if not provided.
+            config: QQ Bot configuration. Can be QQBotConfig, dict, or None.
+                   If dict, will be converted to QQBotConfig.
         """
-        super().__init__(config or QQBotConfig())
+        if config is None:
+            config_obj = QQBotConfig()
+        elif isinstance(config, dict):
+            config_obj = QQBotConfig(**config)
+        else:
+            config_obj = config
+        super().__init__(config_obj)
         self._token: TokenInfo | None = None
         self._http_client = httpx.AsyncClient(
             base_url="https://api.sgroup.qq.com",
