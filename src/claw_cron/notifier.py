@@ -33,6 +33,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from claw_cron.channels import MessageResult, get_channel
+from claw_cron.config import load_config
 
 if TYPE_CHECKING:
     from claw_cron.storage import Task
@@ -145,8 +146,12 @@ class Notifier:
         if not task.notify:
             return []
 
+        # Load channel config from config.yaml
+        config = load_config()
+        channel_config = config.get("channels", {}).get(task.notify.channel, {})
+
         try:
-            channel = get_channel(task.notify.channel)
+            channel = get_channel(task.notify.channel, config=channel_config if channel_config else None)
         except (ValueError, Exception) as e:
             # Channel not available or misconfigured
             return [
@@ -189,6 +194,10 @@ class Notifier:
         Returns:
             Formatted notification message.
         """
+        # Reminder type: send only the message content, no task metadata
+        if task.type == "reminder":
+            return output or render_message(task.message or "")
+
         status = "成功" if exit_code == 0 else "失败"
         lines = [
             f"任务: {task.name}",

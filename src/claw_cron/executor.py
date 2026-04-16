@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +15,9 @@ from pathlib import Path
 from claw_cron.config import get_client_cmd
 from claw_cron.notifier import Notifier, render_message
 from claw_cron.storage import Task
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 LOGS_DIR = Path.home() / ".config" / "claw-cron" / "logs"
 
@@ -49,7 +53,14 @@ def execute_task(task: Task) -> tuple[int, str]:
     if task.type == "reminder":
         # Reminder type: just return the rendered message
         message = render_message(task.message or "")
-        _write_log(log_path, f"[{ts_start}] REMINDER: {task.name}\n{message}\n\n")
+        # Log full task execution info
+        log_content = (
+            f"[{ts_start}] REMINDER: {task.name}\n"
+            f"任务: {task.name}\n"
+            f"状态: 成功\n"
+            f"结果:\n{message}\n\n"
+        )
+        _write_log(log_path, log_content)
         return 0, message
 
     if task.type == "command":
@@ -97,10 +108,30 @@ async def execute_task_with_notify(task: Task) -> int:
     if task.notify:
         try:
             notifier = Notifier()
-            await notifier.notify_task_result(task, exit_code, output)
-        except Exception:
-            # Log but don't fail the task
-            pass
+            results = await notifier.notify_task_result(task, exit_code, output)
+
+            # Log notification results
+            if results:
+                failed_count = sum(1 for r in results if not r.success)
+                success_count = len(results) - failed_count
+
+                if success_count > 0:
+                    logger.info(
+                        f"Notification sent successfully to {success_count} recipient(s) "
+                        f"via {task.notify.channel}"
+                    )
+
+                if failed_count > 0:
+                    for result in results:
+                        if not result.success:
+                            logger.error(
+                                f"Notification failed for task '{task.name}' "
+                                f"via {task.notify.channel}: {result.error}"
+                            )
+        except Exception as e:
+            logger.error(
+                f"Notification error for task '{task.name}': {type(e).__name__}: {e}"
+            )
 
     return exit_code
 
