@@ -21,6 +21,7 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 - [ ] 支持 kiro-cli、codebuddy、opencode 三种 AI 客户端，默认 kiro-cli，添加任务时可指定
 - [ ] 任务配置存储为 YAML 文件，项目自管理
 - [ ] CLI 提供 list、delete 命令，也支持通过 AI 对话完成增删查
+- [ ] add 命令支持直接模式：提供完整参数（cron 表达式、执行类型、脚本/提示词、AI 客户端）时跳过 AI 交互直接生成任务，供其他 Agent 作为 skill 调用
 - [ ] server 命令启动调度服务，默认前台运行，--daemon 参数支持守护进程模式
 - [ ] 遵循 python-cli-project-design 规范（Click + Rich + hatch + uv）
 
