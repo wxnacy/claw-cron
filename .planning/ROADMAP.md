@@ -1,8 +1,9 @@
-# Roadmap: claw-cron v2
+# Roadmap: claw-cron v2.1
 
 **Created:** 2026-04-16
-**Phases:** 4 (Phase 5-8, continuing from v1)
-**Requirements:** 33 v2 requirements mapped ✓
+**Updated:** 2026-04-16
+**Phases:** 5 (Phase 5-9, continuing from v1)
+**Requirements:** 40 v2.x requirements mapped ✓
 
 ---
 
@@ -90,10 +91,10 @@
 - `pyproject.toml` — 添加 `tenacity` 依赖
 
 **Plans:**
-- [ ] 07-01-PLAN.md — QQ Bot Infrastructure + OAuth2 (Wave 1)
-- [ ] 07-02-PLAN.md — QQ Bot Message Sending (Wave 2)
+- [x] 07-01-PLAN.md — QQ Bot Infrastructure + OAuth2 (Wave 1) ✅
+- [x] 07-02-PLAN.md — QQ Bot Message Sending (Wave 2) ✅
 
-**Status:** 📋 Planned
+**Status:** ✅ Complete (2026-04-16)
 
 ---
 
@@ -120,8 +121,38 @@
 - `src/claw_cron/executor.py` — 集成通知调用
 
 **Plans:**
-- [ ] 08-01-PLAN.md — Task Notification Integration (Wave 1)
-- [ ] 08-02-PLAN.md — Reminder Command (Wave 2)
+- [x] 08-01-PLAN.md — Task Notification Integration (Wave 1) ✅
+- [x] 08-02-PLAN.md — Reminder Command (Wave 2) ✅
+
+**Status:** ✅ Complete (2026-04-16)
+
+---
+
+## Phase 9: Channel Management Commands
+
+**Goal:** 添加 `channels` 命令，支持交互式管理 QQ 通道配置，并通过 WebSocket 自动捕获用户 OpenID。
+
+**Requirements:** CHAN-MGMT-01 ~ CHAN-MGMT-07
+
+**Plans:** 2 plans in 2 waves
+
+**Success Criteria:**
+1. `claw-cron channels add` 可交互式配置 QQ Bot
+2. WebSocket 连接可接收消息事件
+3. 用户发送消息后自动捕获 openid
+4. `remind` 命令支持使用联系人别名
+
+**UI hint**: no
+
+**Key Files:**
+- `src/claw_cron/cmd/channels.py` — channels 命令组
+- `src/claw_cron/contacts.py` — 联系人管理
+- `src/claw_cron/qqbot/websocket.py` — WebSocket 客户端
+- `src/claw_cron/qqbot/events.py` — 事件类型定义
+
+**Plans:**
+- [ ] 09-01-PLAN.md — Channels Command & Configuration (Wave 1)
+- [ ] 09-02-PLAN.md — WebSocket & OpenID Capture (Wave 2)
 
 **Status:** 📋 Planned
 
@@ -135,9 +166,10 @@
 | Phase 6 | CHAN-01~04, IMSG-01~04 | 8 |
 | Phase 7 | QQ-01~06 | 6 |
 | Phase 8 | NOTIF-01~05, REMIND-01~03 | 8 |
-| **Total** | | **33** |
+| Phase 9 | CHAN-MGMT-01~07 | 7 |
+| **Total** | | **40** |
 
-All v2 requirements mapped ✓
+All v2.x requirements mapped ✓
 
 ---
 
@@ -178,10 +210,20 @@ channels:
   imessage:
     enabled: true
 
-  qq:
+  qqbot:
     enabled: true
     app_id: ${QQ_BOT_APP_ID}
     client_secret: ${QQ_BOT_CLIENT_SECRET}
+```
+
+```yaml
+# ~/.config/claw-cron/contacts.yaml
+contacts:
+  me:
+    openid: E4F4AEA33253A2797FB897C50B81D7ED
+    channel: qqbot
+    alias: me
+    created: "2026-04-16T22:00:00"
 ```
 
 ```yaml
@@ -200,11 +242,12 @@ channels:
   type: reminder
   message: "早安！今天有 3 个任务待完成"
   notify:
-    channel: qq
+    channel: qqbot
     recipients:
-      - "c2c:USER_OPENID"
+      - "me"  # Uses contact alias instead of openid
 ```
 
 ---
 *Created: 2026-04-16*
+*Updated: 2026-04-16*
 *Continues from v1.0 (Phase 1-4)*
