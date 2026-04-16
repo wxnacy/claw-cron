@@ -31,7 +31,7 @@
 - `src/claw_cron/config.py` — 添加 AIConfig
 
 **Plans:**
-- [ ] 05-01-PLAN.md — Provider Infrastructure & Configuration (Wave 1)
+- [x] 05-01-PLAN.md — Provider Infrastructure & Configuration (Wave 1) ✅
 - [ ] 05-02-PLAN.md — Provider Implementations & Agent Refactor (Wave 2)
 
 ---
