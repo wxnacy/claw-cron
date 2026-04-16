@@ -178,7 +178,7 @@ class QQBotWebSocket:
         await self.ws.send(json.dumps({
             "op": OpCode.IDENTIFY.value,
             "d": {
-                "token": f"Bot {self.config.app_id}.{self.config.access_token}",
+                "token": f"QQBot {self.config.access_token}",
                 "intents": self.config.intents,
                 "shard": [0, 1],
                 "properties": {}
@@ -192,7 +192,7 @@ class QQBotWebSocket:
         await self.ws.send(json.dumps({
             "op": OpCode.RESUME.value,
             "d": {
-                "token": f"Bot {self.config.app_id}.{self.config.access_token}",
+                "token": f"QQBot {self.config.access_token}",
                 "session_id": self.session_id,
                 "seq": self.seq
             }

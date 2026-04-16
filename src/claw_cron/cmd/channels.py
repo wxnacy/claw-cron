@@ -244,6 +244,8 @@ async def _capture_qqbot_openid(alias: str) -> None:
         async def wait_for_capture() -> None:
             while not captured_openid:
                 await asyncio.sleep(0.5)
+            # Capture complete - close WebSocket to allow gather() to return
+            await ws_client.close()
 
         await asyncio.gather(
             ws_client.connect(),
