@@ -5,6 +5,8 @@
 import click
 
 from claw_cron.__about__ import __version__
+from claw_cron.cmd.delete import delete
+from claw_cron.cmd.list import list_tasks
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -12,3 +14,7 @@ from claw_cron.__about__ import __version__
 def cli() -> None:
     """claw-cron: AI-powered cron task manager."""
     pass
+
+
+cli.add_command(list_tasks)
+cli.add_command(delete)
