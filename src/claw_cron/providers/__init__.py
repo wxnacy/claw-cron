@@ -22,4 +22,29 @@ Usage (after Plan 02):
     result = provider.chat_with_tools(messages, system_prompt, tools)
 """
 
-__all__: list[str] = []  # Will be populated in Plan 02
+from .base import BaseProvider, ProviderResult
+from .exceptions import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderModelNotFoundError,
+    ProviderRateLimitError,
+    ProviderResponseError,
+)
+from .tools import ToolCall, ToolDefinition, to_anthropic_tool, to_openai_tool
+
+__all__ = [
+    # Base classes
+    "BaseProvider",
+    "ProviderResult",
+    # Tool abstraction
+    "ToolDefinition",
+    "ToolCall",
+    "to_anthropic_tool",
+    "to_openai_tool",
+    # Exceptions
+    "ProviderError",
+    "ProviderAuthError",
+    "ProviderRateLimitError",
+    "ProviderModelNotFoundError",
+    "ProviderResponseError",
+]
