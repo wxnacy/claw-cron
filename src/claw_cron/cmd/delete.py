@@ -7,6 +7,7 @@
 import click
 from rich.console import Console
 
+from claw_cron.prompt import prompt_confirm
 from claw_cron.storage import delete_task, get_task
 
 console = Console()
@@ -21,6 +22,8 @@ def delete(name: str) -> None:
         console.print(f"[red]Task '{name}' not found.[/red]")
         raise SystemExit(1)
 
-    click.confirm(f"Delete task '{name}'?", abort=True)
+    if not prompt_confirm(f"Delete task '{name}'?"):
+        console.print("[dim]Cancelled.[/dim]")
+        raise SystemExit(0)
     delete_task(name)
     console.print(f"[green]Task '{name}' deleted.[/green]")
