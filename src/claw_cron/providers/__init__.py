@@ -34,6 +34,7 @@ from .exceptions import (
 )
 from .tools import ToolCall, ToolDefinition, to_anthropic_tool, to_openai_tool
 from .anthropic import AnthropicProvider
+from .openai import OpenAIProvider
 
 __all__ = [
     # Base classes
@@ -52,6 +53,7 @@ __all__ = [
     "ProviderResponseError",
     # Providers
     "AnthropicProvider",
+    "OpenAIProvider",
     # Factory
     "get_provider",
     "ProviderType",
@@ -82,6 +84,7 @@ def get_provider(
     """
     providers = {
         "claude": AnthropicProvider,
+        "openai": OpenAIProvider,
     }
 
     if provider not in providers:
