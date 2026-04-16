@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claw-cron"
+dynamic = ["version"]
+description = "AI-powered cron task manager"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+  { name = "wxnacy", email = "371032668@qq.com" },
+]
+dependencies = [
+    "click",
+    "rich",
+    "pyyaml",
+    "anthropic",
+]
+
+[project.scripts]
+claw-cron = "claw_cron.cli:cli"
+
+[tool.hatch.version]
+path = "src/claw_cron/__about__.py"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
