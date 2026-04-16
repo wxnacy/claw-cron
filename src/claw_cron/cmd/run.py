@@ -7,7 +7,7 @@
 import click
 from rich.console import Console
 
-from claw_cron.executor import LOGS_DIR, execute_task
+from claw_cron.executor import LOGS_DIR, run_task_with_notify
 from claw_cron.storage import get_task
 
 console = Console()
@@ -26,12 +26,10 @@ def run(name: str) -> None:
     console.print(f"[cyan]Running task '{name}'...[/cyan]")
     console.print(f"[dim]Log: {log_path}[/dim]")
 
-    exit_code, output = execute_task(task)
+    exit_code = run_task_with_notify(task)
 
     if exit_code == 0:
         console.print(f"[green]Task '{name}' completed successfully.[/green]")
     else:
         console.print(f"[red]Task '{name}' failed (exit_code={exit_code}).[/red]")
-        if output:
-            console.print(f"[dim]{output[:500]}[/dim]")
     raise SystemExit(exit_code)
