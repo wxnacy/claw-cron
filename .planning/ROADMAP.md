@@ -1,69 +1,103 @@
-# Roadmap: claw-cron
+# Roadmap: claw-cron v2
 
 **Created:** 2026-04-16
-**Phases:** 4
-**Requirements:** 18 v1 requirements mapped ✓
+**Phases:** 4 (Phase 5-8, continuing from v1)
+**Requirements:** 33 v2 requirements mapped ✓
 
 ---
 
-## Phase 1: Project Foundation
+## Phase 5: AI Provider 重构
 
-**Goal:** 搭建符合 python-cli-project-design 规范的项目骨架，实现任务配置的 YAML 存储层。
+**Goal:** 重构 agent.py 为 Provider 模式，支持 Anthropic 和 OpenAI 双提供商。
 
-**Requirements:** SETUP-01, SETUP-02, SETUP-03, STORE-01, STORE-02
+**Requirements:** PROV-01 ~ PROV-07, TOOL-01 ~ TOOL-04
+
+**Plans:** 2 plans in 2 waves
 
 **Success Criteria:**
-1. `claw-cron --version` 输出版本号，`-h` 输出帮助信息
-2. 任务 YAML 文件可正确读写，包含所有必要字段（名称、cron、类型、脚本/提示词、客户端、状态）
-3. `uv run claw-cron` 可正常启动，Rich 输出正常渲染
+1. `claw-cron add` 可使用 Anthropic 或 OpenAI Provider（通过配置选择）
+2. Tool Use 功能正常工作，`create_task` Tool 可被正确调用
+3. 配置支持环境变量 `CLAW_CRON_PROVIDER`、`CLAW_CRON_API_KEY`、`CLAW_CRON_MODEL`
+4. 现有 `agent.py` 对话流程不变，用户无感知切换
 
 **UI hint**: no
+
+**Key Files:**
+- `src/claw_cron/providers/__init__.py` — Provider 工厂
+- `src/claw_cron/providers/base.py` — BaseProvider 抽象类
+- `src/claw_cron/providers/anthropic.py` — Anthropic 实现
+- `src/claw_cron/providers/openai.py` — OpenAI 实现
+- `src/claw_cron/providers/tools.py` — Tool 格式转换
+- `src/claw_cron/config.py` — 添加 AIConfig
+
+**Plans:**
+- [ ] 05-01-PLAN.md — Provider Infrastructure & Configuration (Wave 1)
+- [ ] 05-02-PLAN.md — Provider Implementations & Agent Refactor (Wave 2)
 
 ---
 
-## Phase 2: Task Management Commands
+## Phase 6: 消息通道基础 + iMessage
 
-**Goal:** 实现任务的增删查 CLI 命令，add 支持直接模式（完整参数）和 AI 交互模式（Anthropic Agent）。
+**Goal:** 建立消息通道抽象层，实现 iMessage 通道支持。
 
-**Requirements:** ADD-01, ADD-02, ADD-03, ADD-04, LIST-01, DELETE-01
+**Requirements:** CHAN-01 ~ CHAN-04, IMSG-01 ~ IMSG-04
 
 **Success Criteria:**
-1. `claw-cron add --cron "0 8 * * *" --type command --script "echo hello" --name test` 直接创建任务，无需交互
-2. `claw-cron add`（无参数）启动 Anthropic Agent 对话，引导用户描述任务并生成配置
-3. `claw-cron list` 以表格形式展示所有任务
-4. `claw-cron delete <name>` 删除指定任务并确认
+1. `MessageChannel` 基类可被继承扩展
+2. `IMessageChannel` 可在 macOS 上发送 iMessage
+3. 支持 `+86` 国际号码格式
+4. 首次运行请求 macOS 辅助功能权限
 
 **UI hint**: no
+
+**Key Files:**
+- `src/claw_cron/channels/__init__.py` — Channel 工厂
+- `src/claw_cron/channels/base.py` — MessageChannel 抽象类
+- `src/claw_cron/channels/imessage.py` — iMessage 实现
+- `pyproject.toml` — 添加 `macpymessenger` 依赖
 
 ---
 
-## Phase 3: Execution Engine & Chat
+## Phase 7: QQ 通道
 
-**Goal:** 实现任务执行引擎（command/agent 两种模式）和 AI 对话管理界面。
+**Goal:** 实现 QQ Bot 消息通道，支持私聊和群聊通知。
 
-**Requirements:** EXEC-01, EXEC-02, EXEC-03, CHAT-01
+**Requirements:** QQ-01 ~ QQ-06
 
 **Success Criteria:**
-1. command 类型任务通过 subprocess 执行，输出捕获并记录
-2. agent 类型任务通过 `kiro-cli -a --no-interactive`、`codebuddy`、`opencode` 等无交互模式执行
-3. `claw-cron chat` 启动对话，用户可用自然语言完成增删查（"删除 test 任务"、"列出所有任务"）
+1. `QQBotChannel` 可通过 QQ 开放平台 API 发送消息
+2. OAuth2 认证正常工作，自动获取 access_token
+3. 支持 `c2c:OPENID` 私聊格式
+4. 支持 `group:GROUP_OPENID` 群聊格式
+5. 支持 Markdown 消息格式
 
 **UI hint**: no
+
+**Key Files:**
+- `src/claw_cron/channels/qq.py` — QQ Bot 实现
+- `pyproject.toml` — 添加 `aiohttp` 依赖（如尚未）
 
 ---
 
-## Phase 4: Scheduler Server
+## Phase 8: 任务通知集成 + 定时提醒
 
-**Goal:** 实现自管理调度服务，解析 cron 表达式，按时触发任务执行。
+**Goal:** 将消息通道集成到任务执行流程，新增定时提醒功能。
 
-**Requirements:** SERVER-01, SERVER-02, SERVER-03
+**Requirements:** NOTIF-01 ~ NOTIF-05, REMIND-01 ~ REMIND-03
 
 **Success Criteria:**
-1. `claw-cron server` 前台启动，输出调度日志，按 cron 表达式准时触发任务
-2. `claw-cron server --daemon` 以守护进程模式后台运行
-3. 调度器正确解析标准 5 字段 cron 表达式（分 时 日 月 周）
+1. 任务 YAML 可配置 `notify.channel` 和 `notify.recipients`
+2. 任务执行完成后自动发送通知
+3. `claw-cron remind` 命令可创建纯提醒任务
+4. 通知消息包含任务名称、状态、结果
 
 **UI hint**: no
+
+**Key Files:**
+- `src/claw_cron/storage.py` — Task 模型扩展
+- `src/claw_cron/notifier.py` — 通知发送逻辑
+- `src/claw_cron/cmd/remind.py` — remind 命令
+- `src/claw_cron/executor.py` — 集成通知调用
 
 ---
 
@@ -71,13 +105,81 @@
 
 | Phase | Requirements | Count |
 |-------|-------------|-------|
-| Phase 1 | SETUP-01, SETUP-02, SETUP-03, STORE-01, STORE-02 | 5 |
-| Phase 2 | ADD-01, ADD-02, ADD-03, ADD-04, LIST-01, DELETE-01 | 6 |
-| Phase 3 | EXEC-01, EXEC-02, EXEC-03, CHAT-01 | 4 |
-| Phase 4 | SERVER-01, SERVER-02, SERVER-03 | 3 |
-| **Total** | | **18** |
+| Phase 5 | PROV-01~07, TOOL-01~04 | 11 |
+| Phase 6 | CHAN-01~04, IMSG-01~04 | 8 |
+| Phase 7 | QQ-01~06 | 6 |
+| Phase 8 | NOTIF-01~05, REMIND-01~03 | 8 |
+| **Total** | | **33** |
 
-All v1 requirements mapped ✓
+All v2 requirements mapped ✓
+
+---
+
+## Dependencies
+
+### New Dependencies
+
+```toml
+# pyproject.toml additions
+dependencies = [
+    # ... existing ...
+    "openai",           # OpenAI Provider
+    "pydantic-settings", # AIConfig
+    "macpymessenger>=0.2.0",  # iMessage (macOS only)
+    "aiohttp>=3.9.0",   # QQ Bot HTTP client
+]
+```
+
+### Optional Dependencies
+
+```toml
+[project.optional-dependencies]
+imessage = ["macpymessenger>=0.2.0"]  # macOS only
+qq = ["aiohttp>=3.9.0"]
+```
+
+---
+
+## Configuration Example
+
+```yaml
+# ~/.config/claw-cron/config.yaml
+ai:
+  provider: claude  # or "openai"
+  model: claude-3-5-haiku-20241022
+  # api_key: from env CLAW_CRON_API_KEY
+
+channels:
+  imessage:
+    enabled: true
+
+  qq:
+    enabled: true
+    app_id: ${QQ_BOT_APP_ID}
+    client_secret: ${QQ_BOT_CLIENT_SECRET}
+```
+
+```yaml
+# ~/.config/claw-cron/tasks.yaml
+- name: daily_backup
+  cron: "0 2 * * *"
+  type: command
+  script: ./backup.sh
+  notify:
+    channel: imessage
+    recipients:
+      - "+8613812345678"
+
+- name: morning_reminder
+  cron: "0 8 * * *"
+  type: reminder
+  message: "早安！今天有 3 个任务待完成"
+  notify:
+    channel: qq
+    recipients:
+      - "c2c:USER_OPENID"
+```
 
 ---
 *Created: 2026-04-16*
+*Continues from v1.0 (Phase 1-4)*
