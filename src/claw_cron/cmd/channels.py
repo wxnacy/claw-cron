@@ -6,6 +6,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime
+
 import click
 import httpx
 from rich.console import Console
@@ -13,6 +16,8 @@ from rich.table import Table
 
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
+from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
+from claw_cron.channels.qqbot import QQBotConfig
 
 console = Console()
 
@@ -25,6 +30,7 @@ def channels() -> None:
         add     Add a new channel configuration
         list    List configured channels
         delete  Delete a channel configuration
+        capture Connect to capture user openid
         contacts Manage contact aliases
     """
     pass
@@ -157,6 +163,109 @@ def delete(channel_type: str, force: bool) -> None:
     if channel_contacts:
         console.print(f"[yellow]Warning: {len(channel_contacts)} contacts still reference this channel.[/yellow]")
         console.print("[dim]Run 'claw-cron channels contacts list' to see them.[/dim]")
+
+
+@channels.command()
+@click.option(
+    "--channel-type",
+    type=click.Choice(["qqbot"], case_sensitive=False),
+    default="qqbot",
+    help="Channel to capture openid from",
+)
+@click.option(
+    "--alias",
+    prompt="Save as contact alias",
+    default="me",
+    help="Alias name for the captured contact",
+)
+def capture(channel_type: str, alias: str) -> None:
+    """Connect to channel and capture user openid.
+
+    This command starts a WebSocket connection and waits for you
+    to send a message to the bot. When received, your openid is
+    captured and saved as a contact alias.
+
+    Example:
+        claw-cron channels capture --alias my_friend
+        # Then send any message to your QQ Bot
+    """
+    if channel_type == "qqbot":
+        asyncio.run(_capture_qqbot_openid(alias))
+
+
+async def _capture_qqbot_openid(alias: str) -> None:
+    """Capture OpenID from QQ Bot WebSocket."""
+    from claw_cron.channels.qqbot import QQBotChannel
+
+    # Load config
+    config = load_config()
+    qq_config = config.get("channels", {}).get("qqbot", {})
+    app_id = qq_config.get("app_id")
+    client_secret = qq_config.get("client_secret")
+
+    if not app_id or not client_secret:
+        console.print("[red]Error: QQ Bot not configured.[/red]")
+        console.print("[dim]Run 'claw-cron channels add' first.[/dim]")
+        raise SystemExit(1)
+
+    # Get access token
+    with console.status("[bold green]Getting access token..."):
+        try:
+            qqbot_config = QQBotConfig(app_id=app_id, client_secret=client_secret)
+            # Create temporary channel instance for token
+            channel = QQBotChannel(qqbot_config)
+            token = await channel._get_access_token()
+            await channel.close()
+        except Exception as e:
+            console.print(f"[red]Failed to get access token: {e}[/red]")
+            raise SystemExit(1)
+
+    # Prepare WebSocket
+    gateway_config = GatewayConfig(app_id=app_id, access_token=token)
+    ws_client = QQBotWebSocket(gateway_config)
+
+    captured_openid: str | None = None
+
+    async def on_message(message) -> None:
+        nonlocal captured_openid
+        captured_openid = message.openid
+        console.print(f"\n[green]✓ OpenID captured: [bold]{message.openid}[/bold][/green]")
+        console.print(f"[dim]Message content: {message.content}[/dim]")
+
+    ws_client.on_c2c_message = on_message
+
+    # Connect and wait
+    console.print("\n[bold]Waiting for message...[/bold]")
+    console.print("[dim]Send any message to your QQ Bot to capture your openid.[/dim]")
+    console.print("[dim]Press Ctrl+C to cancel.[/dim]\n")
+
+    try:
+        # Run until openid captured or user cancels
+        async def wait_for_capture() -> None:
+            while not captured_openid:
+                await asyncio.sleep(0.5)
+
+        await asyncio.gather(
+            ws_client.connect(),
+            wait_for_capture()
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled.[/yellow]")
+        return
+    finally:
+        await ws_client.close()
+
+    # Save contact
+    if captured_openid:
+        contact = Contact(
+            openid=captured_openid,
+            channel="qqbot",
+            alias=alias,
+            created=datetime.now().isoformat(),
+        )
+        save_contact(contact)
+        console.print(f"\n[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
+        console.print(f"[dim]You can now use 'claw-cron remind --recipient {alias}'[/dim]")
 
 
 @click.group()
