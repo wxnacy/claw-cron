@@ -16,6 +16,7 @@ from rich.table import Table
 
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
+from claw_cron.prompt import prompt_confirm
 from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
 from claw_cron.channels.qqbot import QQBotConfig
 
@@ -149,7 +150,7 @@ def delete(channel_type: str, force: bool) -> None:
         return
 
     if not force:
-        if not click.confirm(f"Delete channel '{channel_type}'?"):
+        if not prompt_confirm(f"Delete channel '{channel_type}'?"):
             console.print("[dim]Cancelled.[/dim]")
             return
 
@@ -318,7 +319,7 @@ def delete(alias: str, force: bool) -> None:
         console.print(f"[yellow]Contact '{alias}' not found.[/yellow]")
         return
 
-    if not force and not click.confirm(f"Delete contact '{alias}'?"):
+    if not force and not prompt_confirm(f"Delete contact '{alias}'?"):
         return
 
     # Load YAML file and remove contact
