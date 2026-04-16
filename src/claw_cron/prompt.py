@@ -1,0 +1,107 @@
+# SPDX-FileCopyrightText: 2026-present wxnacy <371032668@qq.com>
+#
+# SPDX-License-Identifier: MIT
+
+"""Interactive prompt utilities using InquirerPy.
+
+This module provides wrapper functions for common interactive prompts,
+including a specialized cron expression selector with human-readable presets.
+"""
+
+from __future__ import annotations
+
+from InquirerPy import inquirer
+from InquirerPy.base.control import Choice
+
+
+def prompt_text(message: str, default: str | None = None) -> str:
+    """Prompt user for text input.
+
+    Args:
+        message: The prompt message to display.
+        default: Optional default value.
+
+    Returns:
+        The user's input string.
+    """
+    return inquirer.text(message=message, default=default).execute()
+
+
+def prompt_confirm(message: str, default: bool = True) -> bool:
+    """Prompt user for confirmation.
+
+    Args:
+        message: The prompt message to display.
+        default: Default value (True for yes, False for no).
+
+    Returns:
+        Boolean indicating user's choice.
+    """
+    return inquirer.confirm(message=message, default=default).execute()
+
+
+def prompt_select(message: str, choices: list[str], default: str | None = None) -> str:
+    """Prompt user to select a single option.
+
+    Args:
+        message: The prompt message to display.
+        choices: List of available choices.
+        default: Optional default choice to pre-select.
+
+    Returns:
+        The selected choice string.
+    """
+    return inquirer.select(message=message, choices=choices, default=default).execute()
+
+
+def prompt_multiselect(message: str, choices: list[str]) -> list[str]:
+    """Prompt user to select multiple options.
+
+    Args:
+        message: The prompt message to display.
+        choices: List of available choices.
+
+    Returns:
+        List of selected choice strings.
+    """
+    return inquirer.checkbox(message=message, choices=choices).execute()
+
+
+def prompt_cron() -> str:
+    """Prompt user to select a cron expression.
+
+    Provides a list of common cron presets with human-readable descriptions,
+    plus an option to enter a custom expression.
+
+    Presets:
+        - 每分钟: * * * * *
+        - 每小时整点: 0 * * * *
+        - 每天早上8点: 0 8 * * *
+        - 每天中午12点: 0 12 * * *
+        - 每天晚上6点: 0 18 * * *
+        - 每周一早上9点: 0 9 * * 1
+        - 工作日早上9点: 0 9 * * 1-5
+        - 每月1号: 0 0 1 * *
+        - 自定义: Enter custom expression
+
+    Returns:
+        The selected or entered cron expression string.
+    """
+    choices = [
+        Choice(value="* * * * *", name="每分钟 (* * * * *)"),
+        Choice(value="0 * * * *", name="每小时整点 (0 * * * *)"),
+        Choice(value="0 8 * * *", name="每天早上8点 (0 8 * * *)"),
+        Choice(value="0 12 * * *", name="每天中午12点 (0 12 * * *)"),
+        Choice(value="0 18 * * *", name="每天晚上6点 (0 18 * * *)"),
+        Choice(value="0 9 * * 1", name="每周一早上9点 (0 9 * * 1)"),
+        Choice(value="0 9 * * 1-5", name="工作日早上9点 (0 9 * * 1-5)"),
+        Choice(value="0 0 1 * *", name="每月1号 (0 0 1 * *)"),
+        Choice(value="custom", name="自定义"),
+    ]
+
+    selected = inquirer.select(message="选择 Cron 时间:", choices=choices).execute()
+
+    if selected == "custom":
+        return prompt_text("输入自定义 Cron 表达式 (分 时 日 月 周):")
+
+    return selected
