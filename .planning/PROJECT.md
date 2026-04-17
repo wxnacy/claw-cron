@@ -8,15 +8,15 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 
 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## Current Milestone: v2.4 微信通道 & Capture 增强
+## Current Milestone: v3.0 Command 上下文机制
 
-**Goal:** 扩展消息通道能力，增加微信支持，优化 capture 交互体验
+**Goal:** 为 command 类型任务增加双向上下文机制，让脚本可获取系统状态并回传执行结果，实现条件化通知
 
 **Target features:**
-- 软件版本升级到 0.2.1
-- channels capture 支持飞书（交互式列表选择）
-- channels 增加微信通道支持
-- channels add 验证成功后自动触发 capture 流程
+- script 通过环境变量、模板变量、上下文文件三种方式接收系统注入的上下文
+- script 通过 stdout 输出 JSON 回传上下文状态（同一任务多次执行间传递）
+- notify 增加 `when` 条件字段（简单表达式：`==` / `!=`），根据上下文决定是否发送通知
+- 内联模式为主（检查 + 通知在一个任务内完成）
 
 ## Requirements
 
@@ -28,8 +28,6 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
   - 执行引擎 & Chat (Phase 3)
   - 调度服务 (Phase 4)
 
-### Validated
-
 - ✅ **v2.1 里程碑已完成** (2026-04-17)
   - 通道管理命令 (Phase 9)
   - WebSocket & OpenID 捕获
@@ -39,12 +37,18 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
   - 飞书通道 (Phase 12)
   - 邮件通道 (Phase 13)
 
-### Active (v2.4)
+- ✅ **v2.4 里程碑已完成** (2026-04-17)
+  - 微信通道 & Capture 增强 (Phase 14-17)
 
-- [ ] 软件版本升级到 0.2.1
-- [ ] channels capture 飞书支持
-- [ ] 微信通道实现
-- [ ] channels add 后自动 capture 流程
+### Active (v3.0)
+
+- [ ] 环境变量上下文注入（系统 → script）
+- [ ] 模板变量上下文注入（系统 → script）
+- [ ] 上下文文件注入（系统 → script）
+- [ ] JSON stdout 上下文回传（script → 系统）
+- [ ] 任务状态持久化（上下文存储）
+- [ ] notify when 条件判断（简单表达式）
+- [ ] 版本升级到 0.3.0
 
 ### Out of Scope
 
@@ -54,6 +58,8 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 - 消息接收/远程控制 — 仅支持发送通知
 - 钉钉通道 — 后续扩展
 - Telegram 通道 — 后续扩展
+- 跨任务上下文共享 — v3.0 仅支持同一任务内上下文传递，跨任务为未来扩展
+- 复杂条件表达式 — 仅支持 == / != 简单判断，不支持 and/or/函数调用
 
 ## Context
 
@@ -83,6 +89,9 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 | 邮件通道使用 aiosmtplib | 异步 SMTP，与项目现有异步架构一致 | — Pending |
 | 飞书通道使用 lark-oapi | 官方 SDK，自动 token 管理，类型安全 | — Pending |
 | 飞书私聊通知 | 类似 QQ Bot 的 open_id 机制，用户需先与机器人交互 | — Pending |
+| 内联模式条件通知 | 检查+通知在同一任务，notify when 字段控制是否发送 | — Pending |
+| JSON stdout 上下文回传 | script 输出 JSON 到 stdout，系统解析并持久化，简单可靠 | — Pending |
+| 三路上下文注入 | 环境变量 + 模板变量 + 上下文文件，覆盖不同脚本使用习惯 | — Pending |
 
 ## Evolution
 
@@ -102,4 +111,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 for v2.4 milestone start*
+*Last updated: 2026-04-17 for v3.0 milestone start*
