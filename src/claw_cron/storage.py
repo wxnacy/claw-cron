@@ -33,6 +33,7 @@ class Task:
         enabled: Whether the task is active. Defaults to True.
         notify: Notification configuration. Optional.
         message: Message for reminder type tasks. Optional.
+        env: Custom environment variables to inject with CLAW_CONTEXT_ prefix. Optional.
     """
 
     name: str
@@ -45,6 +46,7 @@ class Task:
     enabled: bool = field(default=True)
     notify: NotifyConfig | None = None
     message: str | None = None
+    env: dict[str, str] | None = None
 
 
 def _load_raw(path: Path = TASKS_FILE) -> list[dict[str, Any]]:

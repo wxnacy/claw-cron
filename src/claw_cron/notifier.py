@@ -50,6 +50,8 @@ class NotifyConfig:
             Format depends on channel:
             - iMessage: Phone numbers with country code ('+8613812345678')
             - QQ Bot: C2C ('c2c:OPENID') or group ('group:GROUP_ID')
+        when: Condition expression for notification delivery (e.g. 'signed_in == false').
+            When None, notification is always sent. Evaluated in Phase 20.
 
     Example:
         >>> config = NotifyConfig(
@@ -60,6 +62,7 @@ class NotifyConfig:
 
     channel: str
     recipients: list[str] = field(default_factory=list)
+    when: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> NotifyConfig:
@@ -80,6 +83,7 @@ class NotifyConfig:
         return cls(
             channel=data.get("channel", ""),
             recipients=data.get("recipients", []),
+            when=data.get("when"),
         )
 
 
