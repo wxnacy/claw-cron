@@ -53,6 +53,7 @@ __all__ = [
     "get_channel_status",
     "CHANNEL_REGISTRY",
     # Channel implementations
+    "FeishuChannel",
     "IMessageChannel",
     "QQBotChannel",
 ]
@@ -135,6 +136,9 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
     if channel_id == "qqbot":
         if "app_id" not in channel_cfg or "client_secret" not in channel_cfg:
             return "⚠", "配置不完整"
+    elif channel_id == "feishu":
+        if "app_id" not in channel_cfg or "app_secret" not in channel_cfg:
+            return "⚠", "配置不完整"
     elif channel_id == "imessage":
         # iMessage doesn't require credentials, just enabled flag
         pass
@@ -143,8 +147,10 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
 
 
 # Import and register built-in channels
+from .feishu import FeishuChannel
 from .imessage import IMessageChannel
 from .qqbot import QQBotChannel
 
+CHANNEL_REGISTRY["feishu"] = FeishuChannel
 CHANNEL_REGISTRY["imessage"] = IMessageChannel
 CHANNEL_REGISTRY["qqbot"] = QQBotChannel
