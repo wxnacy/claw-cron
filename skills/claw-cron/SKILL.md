@@ -33,6 +33,7 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 | `claw-cron add` | Add a new scheduled task |
 | `claw-cron command` | Create a command-type task (supports interactive mode) |
 | `claw-cron list` | List all tasks |
+| `claw-cron update <name>` | Update fields of an existing task (`--cron`, `--enabled`, `--message`, `--script`, `--prompt`) |
 | `claw-cron delete <name>` | Delete a task |
 | `claw-cron run <name>` | Execute a task immediately |
 | `claw-cron log <name>` | View execution logs |
