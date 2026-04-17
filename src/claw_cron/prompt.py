@@ -142,3 +142,31 @@ def prompt_channel_select() -> str:
         message="选择通道类型:",
         choices=choices,
     ).execute()
+
+
+def prompt_capture_channel_select() -> str:
+    """Prompt user to select a capture-capable channel with status indicators.
+
+    Filters CHANNEL_REGISTRY to only show channels where supports_capture is True.
+
+    Returns:
+        The selected channel identifier string.
+    """
+    from claw_cron.channels import get_channel
+
+    choices = []
+    for channel_id in sorted(CHANNEL_REGISTRY.keys()):
+        ch = get_channel(channel_id)
+        if not ch.supports_capture:
+            continue
+        icon, status_text = get_channel_status(channel_id)
+        name = f"{channel_id} ({status_text} {icon})"
+        choices.append(Choice(value=channel_id, name=name))
+
+    if not choices:
+        raise ValueError("没有支持 capture 的通道")
+
+    return inquirer.select(
+        message="选择通道类型:",
+        choices=choices,
+    ).execute()
