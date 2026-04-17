@@ -56,21 +56,21 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| CTX-04 | — | Pending |
-| CTX-05 | — | Pending |
-| CTX-06 | — | Pending |
-| COND-01 | — | Pending |
-| COND-02 | — | Pending |
-| COND-03 | — | Pending |
-| VER-01 | — | Pending |
+| CTX-01 | Phase 19 | Pending |
+| CTX-02 | Phase 18 | Pending |
+| CTX-03 | Phase 19 | Pending |
+| CTX-04 | Phase 19 | Pending |
+| CTX-05 | Phase 19 | Pending |
+| CTX-06 | Phase 18 | Pending |
+| COND-01 | Phase 18 | Pending |
+| COND-02 | Phase 20 | Pending |
+| COND-03 | Phase 20 | Pending |
+| VER-01 | Phase 20 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-17*

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Command 上下文机制
-status: Not started (defining requirements)
-last_updated: "2026-04-17T14:00:00.000Z"
+status: Ready to plan
+last_updated: "2026-04-17T15:00:00.000Z"
 last_activity: 2026-04-17
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -23,18 +23,20 @@ progress:
 
 **Current Milestone:** v3.0 Command 上下文机制
 
-**Current Focus:** Defining requirements
+**Current Focus:** Phase 18 — Data Model & Context Storage
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 18 of 20 (Data Model & Context Storage)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-17 — Milestone v3.0 started
+Status: Ready to plan
+Last activity: 2026-04-17 — Roadmap created for v3.0
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-**Velocity:** TBD (milestone started)
+**Velocity:** TBD (v3.0 milestone starting)
 **Cycle Time:** TBD
 **Blocked Time:** 0h
 
@@ -42,18 +44,16 @@ Last activity: 2026-04-17 — Milestone v3.0 started
 
 ### Decisions
 
-- Milestone v3.0 started after v2.4 completion
-- Focus on command task context mechanism (bidirectional)
-- Inline mode (check + notify in one task) as primary pattern
-- Context scope: same-task only (cross-task deferred)
-- JSON stdout for script → system context
-- Three injection methods: env vars + template vars + context file
-- Simple expression for when condition (== / != only)
+- Phase numbering continues from Phase 18 (v2.4 ended at Phase 17)
+- 3-phase coarse structure for v3.0: Data Model → Injection/Feedback → Conditional Notify
+- CTX-02 mapped to Phase 18 (env field definition is the foundation for injection)
+- CTX-06 mapped to Phase 18 (context field + persistence enables feedback loop)
+- COND-01 mapped to Phase 18 (when field definition is the data model part)
+- COND-02/03 mapped to Phase 20 (runtime evaluation logic)
 
 ### Active Todos
 
-- [ ] Define v3.0 requirements
-- [ ] Create v3.0 roadmap
+- [ ] Plan Phase 18
 
 ### Blockers
 
@@ -63,12 +63,12 @@ None
 
 **Recent Activity:**
 
-- 2026-04-17: Milestone v3.0 started — Command 上下文机制
+- 2026-04-17: Milestone v3.0 roadmap created — 3 phases (18-20), 10 requirements mapped
 
 **Next Actions:**
 
-1. Define requirements and create roadmap
+1. Plan Phase 18: Data Model & Context Storage
 
 ---
 
-*State initialized: 2026-04-17*
+*State updated: 2026-04-17*

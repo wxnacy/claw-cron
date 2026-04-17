@@ -1,130 +1,132 @@
-# Roadmap: claw-cron v2.4
+# Roadmap: claw-cron v3.0
 
-**Milestone:** v2.4 微信通道 & Capture 增强
+**Milestone:** v3.0 Command 上下文机制
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 **Created:** 2026-04-17
 **Granularity:** coarse
 
+## Milestones
+
+- ✅ **v2.4 微信通道 & Capture 增强** - Phases 14-17 (shipped 2026-04-17)
+- 🚧 **v3.0 Command 上下文机制** - Phases 18-20 (in progress)
+
 ## Phases
 
-- [x] **Phase 14: Architecture Enhancement** - Capture 统一抽象，为通道提供 capture 支持 *(completed 2026-04-17)*
-- [x] **Phase 15: Capture Interaction** - 改进 capture 交互体验，自动化 capture 流程 *(completed 2026-04-17)*
-- [x] **Phase 16: WeChat Channel** - 企业微信应用消息通知通道 *(completed 2026-04-17)*
-- [x] **Phase 17: Verification & Release** - 功能验证与版本升级 (completed 2026-04-17)
+<details>
+<summary>✅ v2.4 微信通道 & Capture 增强 (Phases 14-17) - SHIPPED 2026-04-17</summary>
+
+### Phase 14: Architecture Enhancement
+**Goal:** 建立统一的 capture 抽象层
+**Plans:** 1 plan complete
+
+### Phase 15: Capture Interaction
+**Goal:** 改进 capture 交互体验
+**Plans:** 1 plan complete
+
+### Phase 16: WeChat Channel
+**Goal:** 企业微信应用消息通知通道
+**Plans:** 1 plan complete
+
+### Phase 17: Verification & Release
+**Goal:** 功能验证与版本升级
+**Plans:** 2 plans complete
+
+</details>
+
+### 🚧 v3.0 Command 上下文机制 (In Progress)
+
+**Milestone Goal:** 为 command 类型任务增加双向上下文机制，让脚本可获取系统状态并回传执行结果，实现条件化通知
+
+- [ ] **Phase 18: Data Model & Context Storage** - 扩展数据模型，支持上下文配置和持久化
+- [ ] **Phase 19: Context Injection & Feedback** - 实现上下文注入与 JSON 回传
+- [ ] **Phase 20: Conditional Notification & Release** - 条件通知与版本发布
 
 ## Phase Details
 
-### Phase 14: Architecture Enhancement
+### Phase 18: Data Model & Context Storage
 
-**Goal:** 建立统一的 capture 抽象层，支持各通道实现特定的 capture 逻辑
+**Goal:** 任务配置支持环境变量定义和上下文持久化，通知可配置条件控制
 
-**Depends on:** Phase 13 (completed)
+**Depends on:** Phase 17 (completed)
 
-**Requirements:** ARCH-01, ARCH-02, ARCH-03, ARCH-04
+**Requirements:** CTX-02, CTX-06, COND-01
 
 **Success Criteria** (what must be TRUE):
-1. Developer can check if a channel supports capture by querying the `supports_capture` property
-2. Developer can implement channel-specific capture logic by overriding the `capture_openid()` method
-3. QQBotChannel capture logic is encapsulated in the `capture_openid()` method (refactored from scattered WebSocket code)
-4. FeishuChannel capture logic is encapsulated in the `capture_openid()` method (refactored from existing open_id capture)
+1. User can define custom environment variables in task config via the `env` field (key-value list)
+2. Task context data persists across executions — context from a previous run is available in subsequent runs
+3. User can specify a `when` condition expression in notify config to control notification delivery
 
 **Plans:** TBD
 
 ---
 
-### Phase 15: Capture Interaction
+### Phase 19: Context Injection & Feedback
 
-**Goal:** 用户可以通过直观的交互界面执行 capture 流程，并在添加通道后自动被询问是否执行 capture
+**Goal:** 脚本在执行时可接收系统注入的上下文，并可通过 stdout 回传结构化数据
 
-**Depends on:** Phase 14
+**Depends on:** Phase 18
 
-**Requirements:** CAPT-01, CAPT-02, CAPT-03, CAPT-04, CAPT-05
-
-**Success Criteria** (what must be TRUE):
-1. User can select channel type from an interactive list when running `channels capture` (no need to remember --channel-type flag)
-2. User receives a friendly message when trying to capture a channel that doesn't support capture (e.g., "This channel doesn't require capture")
-3. User is automatically prompted to run capture after successfully adding a channel that supports capture
-4. User sees real-time status feedback during capture process (e.g., "Waiting for message from QQ Bot...")
-5. Capture process automatically times out after 5 minutes with a clear error message
-
-**Plans:** TBD
-
-**UI hint:** yes
-
----
-
-### Phase 16: WeChat Channel
-
-**Goal:** 用户可以通过企业微信应用接收私聊任务通知
-
-**Depends on:** Phase 14
-
-**Requirements:** WECHAT-01, WECHAT-02, WECHAT-03, WECHAT-04, WECHAT-05
+**Requirements:** CTX-01, CTX-03, CTX-04, CTX-05
 
 **Success Criteria** (what must be TRUE):
-1. User can configure WeChat Work app credentials (corp_id, agent_id, secret) interactively
-2. User can receive private text messages via WeChat Work application
-3. User can receive private Markdown messages via WeChat Work application
-4. System automatically manages access_token lifecycle (acquisition, caching, refresh before expiration)
-5. User can obtain their WeChat userid through the capture command
+1. Scripts can read system context (task name, type, last exit code, last output) via CLAW_TASK_NAME, CLAW_TASK_TYPE, CLAW_LAST_EXIT_CODE, CLAW_LAST_OUTPUT environment variables
+2. Scripts can reference context values in script content using `{{ context.xxx }}` template syntax (e.g., `{{ context.signed_in }}`)
+3. Scripts can read full context JSON from a temp file whose path is provided in CLAW_CONTEXT_FILE environment variable
+4. Scripts can output JSON to stdout that gets parsed and persisted as task context for subsequent executions
 
 **Plans:** TBD
 
 ---
 
-### Phase 17: Verification & Release
+### Phase 20: Conditional Notification & Release
 
-**Goal:** 验证所有功能正常工作，发布版本 0.2.1
+**Goal:** 通知仅在条件满足时发送，版本升级到 0.3.0
 
-**Depends on:** Phase 15, Phase 16
+**Depends on:** Phase 19
 
-**Requirements:** VERS-01
+**Requirements:** COND-02, COND-03, VER-01
 
 **Success Criteria** (what must be TRUE):
-1. User can successfully add, verify, and capture all channel types (QQ, Feishu, Email, WeChat)
-2. User can send test notifications through all configured channels
-3. All channels handle rate limits and errors gracefully
-4. Version number is updated to 0.2.1 in pyproject.toml
-5. Documentation reflects new features (WeChat channel, capture improvements)
+1. Notification is sent only when the `when` expression evaluates to true against the task context (e.g., `signed_in == false` suppresses notification when user is signed in)
+2. `==` and `!=` operators work correctly for string and boolean value comparisons in when expressions
+3. Notifications are sent as before when no `when` field is specified — existing tasks continue to work unchanged
+4. Version number is updated to 0.3.0 in pyproject.toml
 
-**Plans:** 2/2 plans complete
+**Plans:** TBD
 
 ---
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 14. Architecture Enhancement | 1/1 | Complete | 2026-04-17 |
-| 15. Capture Interaction | 1/1 | Complete | 2026-04-17 |
-| 16. WeChat Channel | 1/1 | Complete | 2026-04-17 |
-| 17. Verification & Release | 2/2 | Complete    | 2026-04-17 |
+**Execution Order:**
+Phases execute in numeric order: 18 → 19 → 20
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 18. Data Model & Context Storage | v3.0 | 0/? | Not started | - |
+| 19. Context Injection & Feedback | v3.0 | 0/? | Not started | - |
+| 20. Conditional Notification & Release | v3.0 | 0/? | Not started | - |
 
 ## Coverage
 
-- Total v2.4 requirements: 15
-- Mapped to phases: 15 ✓
+- Total v3.0 requirements: 10
+- Mapped to phases: 10 ✓
 - Orphaned requirements: 0 ✓
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ARCH-01 | Phase 14 | Complete |
-| ARCH-02 | Phase 14 | Complete |
-| ARCH-03 | Phase 14 | Complete |
-| ARCH-04 | Phase 14 | Complete |
-| CAPT-01 | Phase 15 | Pending |
-| CAPT-02 | Phase 15 | Pending |
-| CAPT-03 | Phase 15 | Pending |
-| CAPT-04 | Phase 15 | Pending |
-| CAPT-05 | Phase 15 | Pending |
-| WECHAT-01 | Phase 16 | Complete |
-| WECHAT-02 | Phase 16 | Complete |
-| WECHAT-03 | Phase 16 | Complete |
-| WECHAT-04 | Phase 16 | Complete |
-| WECHAT-05 | Phase 16 | Complete |
-| VERS-01 | Phase 17 | Pending |
+| CTX-01 | Phase 19 | Pending |
+| CTX-02 | Phase 18 | Pending |
+| CTX-03 | Phase 19 | Pending |
+| CTX-04 | Phase 19 | Pending |
+| CTX-05 | Phase 19 | Pending |
+| CTX-06 | Phase 18 | Pending |
+| COND-01 | Phase 18 | Pending |
+| COND-02 | Phase 20 | Pending |
+| COND-03 | Phase 20 | Pending |
+| VER-01 | Phase 20 | Pending |
 
 ---
 
 *Roadmap created: 2026-04-17*
-*Milestone: v2.4*
+*Milestone: v3.0*
