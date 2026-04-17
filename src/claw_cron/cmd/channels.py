@@ -142,6 +142,52 @@ def add(capture_openid: bool) -> None:
             console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
             asyncio.run(_capture_feishu_openid(alias="me"))
 
+    elif channel_type == "email":
+        host = click.prompt("SMTP Host", type=str)
+        port = click.prompt("SMTP Port", type=int, default=587)
+        username = click.prompt("Username", type=str)
+        password = click.prompt("Password", type=str, hide_input=True)
+        from_email = click.prompt("From Email", type=str)
+        use_tls = click.confirm("Use TLS", default=True)
+
+        # Validate by sending a test email (D-05)
+        with console.status("[bold green]正在发送验证邮件..."):
+            try:
+                import asyncio as _asyncio
+                from claw_cron.channels.email import EmailChannel, EmailConfig
+                test_config = EmailConfig(
+                    host=host, port=port, username=username,
+                    password=password, from_email=from_email, use_tls=use_tls,
+                )
+                channel = EmailChannel(test_config)
+                result = _asyncio.run(channel.send_text(
+                    from_email,
+                    "claw-cron 邮件通道验证邮件\n\n此邮件由 claw-cron 自动发送，用于验证 SMTP 配置。",
+                ))
+                if not result.success:
+                    raise click.ClickException(f"验证失败: {result.error}")
+                console.print("[green]✓ 验证邮件已发送[/green]")
+            except Exception as e:
+                if isinstance(e, click.ClickException):
+                    raise
+                raise click.ClickException(f"连接失败: {e}") from e
+
+        # Save to config.yaml
+        if "channels" not in config:
+            config["channels"] = {}
+        config["channels"][channel_type] = {
+            "host": host,
+            "port": port,
+            "username": username,
+            "password": password,
+            "from_email": from_email,
+            "use_tls": use_tls,
+            "enabled": True,
+            "created_at": datetime.now().isoformat(),
+        }
+        save_config(config)
+        console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
+
     elif channel_type == "imessage":
         # iMessage doesn't require credentials
         if "channels" not in config:
@@ -249,7 +295,7 @@ def delete(channel_type: str, force: bool) -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email"]))
 def verify(channel_type: str) -> None:
     """Verify channel credentials and connectivity.
 
@@ -348,6 +394,36 @@ def verify(channel_type: str) -> None:
 
         console.print("[green]✓ iMessage 可用[/green]")
         console.print("[dim]平台: macOS[/dim]")
+
+    elif channel_type == "email":
+        email_cfg = channels_config["email"]
+        required_fields = ["host", "username", "password", "from_email"]
+        missing = [f for f in required_fields if not email_cfg.get(f)]
+        if missing:
+            console.print(f"[red]✗ 配置不完整：缺少 {', '.join(missing)}[/red]")
+            raise SystemExit(1)
+
+        with console.status("[bold green]正在发送验证邮件..."):
+            try:
+                import asyncio as _asyncio
+                from claw_cron.channels.email import EmailChannel, EmailConfig
+                test_config = EmailConfig(**{k: v for k, v in email_cfg.items() if k not in ("created_at", "enabled")})
+                channel = EmailChannel(test_config)
+                result = _asyncio.run(channel.send_text(
+                    email_cfg["from_email"],
+                    "claw-cron 邮件通道验证邮件",
+                ))
+                if not result.success:
+                    console.print(f"[red]✗ 验证失败: {result.error}[/red]")
+                    raise SystemExit(1)
+                console.print("[green]✓ 验证邮件已发送[/green]")
+                console.print(f"[dim]SMTP Host: {email_cfg['host']}:{email_cfg.get('port', 587)}[/dim]")
+                console.print(f"[dim]From: {email_cfg['from_email']}[/dim]")
+            except SystemExit:
+                raise
+            except Exception as e:
+                console.print(f"[red]✗ 连接失败: {e}[/red]")
+                raise SystemExit(1)
 
     console.print(f"\n[green]✓ 通道 '{channel_type}' 验证通过[/green]")
 
