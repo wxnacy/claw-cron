@@ -1,160 +1,383 @@
-# Feature Research
+# Feature Landscape
 
-**Domain:** claw-cron 微信通道 & Capture 增强
+**Domain:** claw-cron v3.0 Command Task Context Mechanism
 **Researched:** 2026-04-17
-**Confidence:** MEDIUM
+**Overall confidence:** HIGH
 
-## Feature Landscape
+## Context
 
-### Table Stakes (Users Expect These)
+This research covers the NEW features for v3.0: bidirectional context passing for command-type cron tasks.
+Existing features (v1-v2) are NOT in scope — they're already built.
 
-Features users assume exist. Missing these = product feels incomplete.
+### Reference Systems Studied
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| 微信通道配置 | 与 QQ/飞书/邮件通道一致的配置流程 | MEDIUM | 需要企业微信应用凭证（corp_id, agent_id, secret） |
-| 微信文本消息发送 | 所有其他通道都支持文本消息 | LOW | 使用企业微信应用消息 API |
-| 用户标识获取 (userid) | 其他通道都有 capture 流程获取 openid | HIGH | 企业微信需要用户授权或管理员查询 |
-| capture 交互式列表 | 当前 capture 命令仅支持参数选择通道 | LOW | 使用 InquirerPy 实现列表选择 |
-| add 后自动 capture | QQ/飞书通道已有此模式（--capture-openid） | LOW | 验证成功后提示执行 capture |
+| System | Context Injection | Context Feedback | State Persistence | Conditional Logic |
+|--------|------------------|-----------------|-------------------|-------------------|
+| **GitHub Actions** | `env` at workflow/job/step level, `GITHUB_ENV` file | `GITHUB_OUTPUT` file (`echo "name=value" >> $GITHUB_OUTPUT`), `steps.<id>.outputs.<name>` | Built-in (runner manages env files per job) | `if: ${{ steps.check.outputs.status == 'success' }}` |
+| **Airflow XCom** | Task context via `**kwargs`, Jinja templates | `xcom_push(key, value)`, auto `return_value` on task return | Database backend (default), pluggable custom backends | `TriggerRule`, downstream task reads XCom |
+| **Jenkins** | Environment injection plugin, `env` global | Build variables, `env.WORKSPACE`, plugin-managed state | Build artifacts, persistent build variables | `when { expression }` in declarative pipeline |
+| **SaltStack** | Pillar (static data), Grains (system facts), SLS context | State return data, `context` dict in state compiler | Mine (cached grains), SDB (key-value store) | `onlyif`, `unless` requisites |
+| **Rundeck** | Job options, context variables (`option.*`) | Export Var step, `data` key in job reference | Job state persistence via Export/Log Data | Node filters, step conditions |
 
-### Differentiators (Competitive Advantage)
+---
 
-Features that set the product apart. Not required, but valuable.
+## Table Stakes
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| 微信 Markdown 消息 | 企业微信支持 markdown_v2，增强通知格式 | MEDIUM | 支持1-6级标题、代码块、表格等 |
-| 微信图片/文件消息 | 通知中包含截图、日志文件等附件 | MEDIUM | 需要先上传素材获取 media_id |
-| 微信模板卡片消息 | 更专业的通知展示（文本通知型、图文展示型） | HIGH | 需要设计模板内容结构 |
-| capture 进度反馈 | 显示捕获等待状态、成功提示 | LOW | 使用 Rich console.status() |
-| 自动 userid 映射 | 通过手机号/邮箱自动查找用户 userid | HIGH | 需要通讯录管理权限 |
+Features users expect. Missing = product feels incomplete for a context-aware task scheduler.
 
-### Anti-Features (Commonly Requested, Often Problematic)
+| Feature | Why Expected | Complexity | Category | Dependencies |
+|---------|--------------|------------|----------|-------------|
+| **Environment variable injection** | Standard in every job runner (GitHub Actions `env`, crontab env vars, Jenkins env injection). Scripts naturally read env vars. | LOW | Context Injection | Existing `subprocess.run` in `executor.py` |
+| **Template variable injection** | Already exists for `reminder` type (`{{ date }}`, `{{ time }}`). Users expect this for command scripts too. | LOW | Context Injection | Existing `render_message()` in `notifier.py` |
+| **Context file injection** | GitHub Actions uses `$GITHUB_OUTPUT`/`$GITHUB_ENV` files. Scripts that prefer file-based input over env vars expect a context file path. | MEDIUM | Context Injection | New: temp file creation, `CLAW_CONTEXT_FILE` env var pointing to it |
+| **JSON stdout context feedback** | Structured output is the industry standard (GitHub Actions `GITHUB_OUTPUT`, Airflow XCom `return_value`). Scripts output JSON, system parses it. | MEDIUM | Context Feedback | Existing `subprocess.run` captures stdout; needs JSON parser |
+| **Task state persistence** | Without persistence, context is lost between executions. Users expect prior run's output to inform the next run. | MEDIUM | State Persistence | New: context storage alongside `tasks.yaml` |
+| **Conditional notification (`when`)** | GitHub Actions has `if` conditions. Notifying on every execution is noisy; users want to filter by script output. | LOW | Conditional Notification | Requires: context feedback + state persistence |
 
-Features that seem good but create problems.
+---
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|-----------------|-------------|
-| Webhook 群机器人 | 配置简单，只需 webhook URL | 只能发群消息，无法私聊；安全性低（URL 泄露风险） | 使用企业微信应用消息 API，支持私聊 |
-| 个人微信机器人 | 用户使用个人微信发送消息 | 违反微信服务条款，账号封禁风险 | 企业微信是官方认可的企业通知通道 |
-| 微信消息接收/回复 | 双向交互、远程控制命令 | 需要服务器接收回调，增加复杂度；超出项目范围 | 保持单向通知模式，符合项目定位 |
-| 自动添加用户到通讯录 | 简化用户标识获取流程 | 需要通讯录写权限，安全风险高 | 使用现有 capture 模式：用户主动发送消息 |
+## Differentiators
+
+Features that set claw-cron apart from simple cron and other task schedulers.
+
+| Feature | Value Proposition | Complexity | Category | Notes |
+|---------|-------------------|------------|----------|-------|
+| **Inline mode (check + notify in one task)** | Most cron tools require separate "check" and "notify" tasks. Claw-cron's inline mode combines them — script checks condition, outputs JSON, `when` decides whether to notify. Simpler user model. | LOW | Conditional Notification | Already decided in PROJECT.md: "内联模式为主" |
+| **Three-way context injection** | env vars + template vars + context file covers all script styles: shell one-liners (env), complex scripts (file), message templates (template vars). No other cron tool offers all three. | LOW | Context Injection | Each path serves a different use case; all are simple to implement |
+| **Per-task context namespace** | Context is scoped per task (not global like crontab env vars, not cross-task like Airflow XCom). Avoids naming collisions and keeps the model simple. | LOW | State Persistence | Decision: v3.0 only same-task context, cross-task is Out of Scope |
+| **Simple `when` expression** | Just `==` and `!=` — intentionally limited. Users don't need a full expression language for 90% of cases (is backup done? did check pass?). Avoids the complexity of GitHub Actions `${{ }}` expressions or Airflow `TriggerRule`. | LOW | Conditional Notification | Explicitly scoped in PROJECT.md: no and/or/function calls |
+
+---
+
+## Anti-Features
+
+Features to explicitly NOT build, with reasoning.
+
+| Anti-Feature | Why Requested | Why Problematic | What to Do Instead |
+|-------------|---------------|-----------------|-------------------|
+| **Cross-task context sharing** | "Let task A read task B's output" | Creates hidden coupling between tasks. If task B is renamed/disabled, task A silently breaks. Airflow XCom has this problem — teams struggle with implicit DAG dependencies. | Use context file as a shared filesystem approach: task A writes to a known file path, task B reads it. Explicit, debuggable. Or defer to v4+. |
+| **Complex condition expressions (and/or/nested/regex)** | "I want `status == 'failed' or status == 'warning'`" | Scope creep into a full expression parser. GitHub Actions uses `${{ }}` with Jinja-like syntax — a DSL that's hard to debug and learn. For a CLI tool, simplicity wins. | Use script-level logic: script does the complex check, outputs `should_notify: true/false`. The `when` field only needs `should_notify == "true"`. |
+| **Structured output schema validation** | "Validate that script output has the right fields" | Adds complexity for little value in a single-user CLI tool. Scripts are user-authored — if the output is wrong, the user fixes the script. | Parse JSON best-effort, log warnings for malformed output. No schema enforcement. |
+| **Context versioning / history** | "Keep the last N context states for audit" | Premature optimization. Nobody asked for this yet. Storage grows unbounded. | Store only the latest context per task. If audit is needed, existing log files (`~/.config/claw-cron/logs/`) already capture full output. |
+| **Context file as YAML** | "Use YAML like tasks.yaml for consistency" | YAML is harder to parse in shell scripts than JSON. JSON is universally supported (`jq`, `python -c "import json"`, `node -e`). | Use JSON for stdout output. Context file on disk can be JSON (simple to read with any tool). |
+| **GITHUB_OUTPUT-style file write for feedback** | "Script writes to `$CLAW_OUTPUT` file like GitHub Actions" | Adds complexity over JSON stdout. Requires teaching users about a file protocol (`echo "key=value" >> $CLAW_OUTPUT`). JSON stdout is simpler — just `echo '{"status": "ok"}'`. | JSON stdout only. One clear protocol, not two. The file-based approach is for INPUT (context file), not output. |
+| **Agent-type task context** | "AI agents should also output context" | Agent output is unstructured AI text, not JSON. Parsing it reliably is a hard NLP problem. | Scope to command-type only. Agent tasks return raw text; reminder tasks have no output. |
+
+---
 
 ## Feature Dependencies
 
 ```
-微信通道基础实现
-    ├──requires──> 企业微信应用配置 (corp_id, agent_id, secret)
-    ├──requires──> MessageChannel 抽象实现 (send_text, send_markdown)
-    └──requires──> access_token 获取逻辑
+Environment variable injection
+    └──requires──> executor.py: subprocess.run with env parameter
 
-用户标识获取 (capture 微信)
-    ├──requires──> 微信通道基础实现
-    ├──requires──> 企业微信 WebSocket 或回调服务器
-    └──requires──> 用户与机器人交互（发送消息）
+Template variable injection
+    ├──requires──> Existing render_message() pattern
+    └──extends──> Template vars for script field (not just message field)
 
-capture 交互式增强
-    └──requires──> InquirerPy select prompt (已有 prompt_channel_select)
+Context file injection
+    ├──requires──> Environment variable injection (CLAW_CONTEXT_FILE path)
+    ├──requires──> Temp file creation with context data
+    └──requires──> Template variable injection ({{ context_file }} as alternative)
 
-add 后自动 capture
-    ├──requires──> capture 交互式增强
-    └──requires──> 验证成功后调用 capture 流程
+JSON stdout context feedback
+    ├──requires──> executor.py: parse stdout after subprocess.run
+    ├──requires──> JSON validation (try json.loads, handle failure gracefully)
+    └──requires──> Task model: no schema change needed (stdout is already captured)
 
-微信图片/文件消息
-    └──requires──> 素材上传接口（获取 media_id）
+Task state persistence
+    ├──requires──> JSON stdout context feedback (source of state data)
+    ├──requires──> New storage: per-task context file or dict in tasks.yaml
+    └──enables──> Conditional notification (when field reads persisted state)
 
-自动 userid 映射
-    ├──conflicts──> 最小权限原则（需要通讯录管理权限）
-    └──requires──> 手机号/邮箱输入交互
+Conditional notification (when)
+    ├──requires──> Task state persistence (context to evaluate against)
+    ├──requires──> NotifyConfig model: add `when` field
+    └──requires──> Expression evaluator (simple == / != parser)
 ```
 
-### Dependency Notes
+### Dependency on Existing Features
 
-- **微信通道基础实现 requires MessageChannel 抽象:** 需要实现 `send_text()` 和 `send_markdown()` 方法，遵循现有通道模式
-- **capture 微信 requires WebSocket/回调服务器:** 企业微信有两种接收消息方式：WebSocket 长连接（类似 QQ Bot）或回调服务器（类似飞书 Webhook）
-- **add 后自动 capture requires capture 交互式增强:** 当前 `capture` 命令通过 `--channel-type` 参数选择通道，需要改为交互式列表以提供更好的用户体验
-- **自动 userid 映射 conflicts with 最小权限原则:** 通讯录管理权限属于敏感权限，企业通常不会轻易授予，建议保持现有 capture 模式（用户主动交互）
+| New Feature | Existing Feature | How It Integrates |
+|------------|-----------------|-------------------|
+| Env var injection | `executor.py` `subprocess.run(cmd, shell=True)` | Add `env` parameter with context vars |
+| Template vars | `notifier.py` `render_message()` | Extend to support `{{ task_name }}`, `{{ last_status }}`, etc. in script field |
+| Context file | `storage.py` `Task` dataclass | Context file path derived from task name |
+| JSON feedback | `executor.py` `result.stdout` | Parse stdout as JSON after execution |
+| State persistence | `storage.py` YAML storage | New file `~/.config/claw-cron/context/<task_name>.json` |
+| When condition | `notifier.py` `NotifyConfig` | Add `when: str | None` field; evaluate before sending |
+| When condition | `executor.py` `execute_task_with_notify()` | Evaluate `when` before calling `notifier.notify_task_result()` |
 
-## MVP Definition (v2.4 Milestone)
+---
 
-### Launch With
+## Feature Detail: Context Injection (System → Script)
 
-Minimum viable product — what's needed to validate the concept.
+### Environment Variables
 
-- [x] 微信通道基础实现 — 与其他通道保持一致的配置和发送体验
-  - 配置：corp_id, agent_id, secret
-  - 发送：send_text() 私聊消息
-  - 验证：验证凭证获取 access_token
-- [x] capture 交互式增强 — 提升用户体验
-  - 使用 InquirerPy 列表选择通道
-  - 支持微信通道（如实现）
-- [x] add 后自动 capture — 简化配置流程
-  - 验证成功后提示执行 capture
-  - 可选：添加 `--capture-openid` 参数（与 QQ/飞书一致）
+**What:** Inject system context as environment variables before script execution.
 
-### Add After Validation (v2.x)
+**Vars to inject:**
 
-Features to add once core is working.
+| Variable | Value | Example |
+|----------|-------|---------|
+| `CLAW_TASK_NAME` | Task name | `"backup-check"` |
+| `CLAW_TASK_TYPE` | Task type | `"command"` |
+| `CLAW_TASK_CRON` | Cron expression | `"0 8 * * *"` |
+| `CLAW_CONTEXT_FILE` | Path to context file | `"/home/user/.config/claw-cron/context/backup-check.json"` |
+| `CLAW_LAST_EXIT_CODE` | Previous execution exit code | `"0"` |
+| `CLAW_LAST_RUN_TIME` | Previous execution timestamp | `"2026-04-17T08:00:00"` |
 
-- [ ] 微信 Markdown 消息 — 增强通知格式
-- [ ] capture 微信用户标识 — 获取 userid 用于私聊通知
-- [ ] 微信图片/文件消息 — 支持附件通知
+**Implementation:** Add `env` dict to `subprocess.run()` call in `executor.py`. Merge with `os.environ` (scripts need PATH, HOME, etc.).
 
-### Future Consideration (v3+)
+**Complexity:** LOW — 5-line change to `execute_task()`.
 
-Features to defer until product-market fit is established.
+### Template Variables
 
-- [ ] 微信模板卡片消息 — 需要设计模板结构
-- [ ] 自动 userid 映射 — 需要评估权限需求
-- [ ] 多企业微信应用支持 — 多租户场景
+**What:** Extend existing `{{ date }}` / `{{ time }}` template rendering to script field.
+
+**Vars to support:**
+
+| Variable | Value | Example |
+|----------|-------|---------|
+| `{{ date }}` | Current date (existing) | `"2026-04-17"` |
+| `{{ time }}` | Current time (existing) | `"08:00:00"` |
+| `{{ task_name }}` | Task name | `"backup-check"` |
+| `{{ last_status }}` | Previous run status string | `"success"` or `"failed"` |
+| `{{ last_exit_code }}` | Previous exit code | `"0"` |
+
+**Implementation:** Call `render_message()` on `task.script` before execution. Add new template vars.
+
+**Complexity:** LOW — extend existing function.
+
+### Context File
+
+**What:** Write current + last context to a JSON file, pass path via `CLAW_CONTEXT_FILE` env var.
+
+**File format:**
+```json
+{
+  "task_name": "backup-check",
+  "last_run": {
+    "time": "2026-04-17T08:00:00",
+    "exit_code": 0,
+    "status": "success",
+    "output": { "disk_usage": "45%", "healthy": true }
+  },
+  "current_run": {
+    "time": "2026-04-17T09:00:00"
+  }
+}
+```
+
+**Implementation:** Write file before subprocess, clean up after. Scripts that don't need it can ignore the env var.
+
+**Complexity:** MEDIUM — file I/O + JSON serialization, but straightforward.
+
+---
+
+## Feature Detail: Context Feedback (Script → System)
+
+### JSON Stdout Parsing
+
+**What:** Script outputs JSON to stdout. System parses it and persists as task context.
+
+**Protocol:**
+1. Script outputs JSON as the LAST line of stdout (allows other output before it)
+2. System tries to parse last line as JSON
+3. If valid JSON: merge into task context and persist
+4. If not JSON: treat as plain output (no context update)
+
+**Why last-line JSON (not entire stdout):**
+- Scripts often produce diagnostic output before the result
+- GitHub Actions uses file-based (`GITHUB_OUTPUT`) which is harder to learn
+- Airflow XCom auto-captures return value — our equivalent is JSON on stdout
+- Alternative: JSON wrapped in markers (`::JSON_START::` / `::JSON_END::`) — more robust but more complex
+
+**Decision: Last-line JSON** — simplest protocol, covers 90% of cases. If a script's last stdout line is valid JSON, it's context. Otherwise, it's just output.
+
+**Example:**
+```bash
+#!/bin/bash
+echo "Checking disk usage..."
+DISK=$(df -h / | tail -1 | awk '{print $5}' | tr -d '%')
+echo "{\"disk_usage\": \"$DISK%\", \"healthy\": $([ $DISK -lt 80 ] && echo true || echo false)}"
+```
+
+**Implementation:** After `subprocess.run`, split stdout by newline, try `json.loads(last_line)`. On success, store as task context.
+
+**Complexity:** MEDIUM — need to handle edge cases (no stdout, no newline, mixed output + JSON).
+
+---
+
+## Feature Detail: State Persistence
+
+### Per-Task Context Storage
+
+**What:** Store task context (from JSON stdout feedback) between executions.
+
+**Storage location:** `~/.config/claw-cron/context/<task_name>.json`
+
+**Why separate files (not in tasks.yaml):**
+- `tasks.yaml` is user-editable config; context is runtime state
+- Context can be large (script output); bloating tasks.yaml is bad UX
+- Separate files allow easy cleanup (`rm ~/.config/claw-cron/context/backup-check.json`)
+- Follows the pattern of log files being separate from task config
+
+**File format:**
+```json
+{
+  "last_run_time": "2026-04-17T08:00:00",
+  "last_exit_code": 0,
+  "last_status": "success",
+  "output": {
+    "disk_usage": "45%",
+    "healthy": true
+  },
+  "history": []
+}
+```
+
+**History:** By design, we store ONLY the last run's context (not a list). The `history` key is reserved but empty — see Anti-Feature "Context versioning / history".
+
+**Implementation:**
+- New module: `context.py` with `load_context(task_name)` / `save_context(task_name, data)`
+- Called from `executor.py` after JSON parsing succeeds
+- Loaded before execution to populate env vars and context file
+
+**Complexity:** MEDIUM — new module, file I/O, but simple JSON read/write.
+
+---
+
+## Feature Detail: Conditional Notification
+
+### `when` Field on NotifyConfig
+
+**What:** Add a `when` field to `NotifyConfig` that controls whether notification is sent based on task context.
+
+**YAML format:**
+```yaml
+tasks:
+  - name: disk-check
+    cron: "0 */6 * * *"
+    type: command
+    script: "check-disk.sh"
+    notify:
+      channel: qqbot
+      recipients: ["c2c:ABC123"]
+      when: "healthy != true"    # Only notify when disk is unhealthy
+```
+
+**Expression syntax:** `<key> <operator> <value>`
+- Keys: reference output fields from context (e.g., `healthy`, `disk_usage`, `status`)
+- Operators: `==` (equals), `!=` (not equals)
+- Values: string literals (quoted or unquoted), numbers, `true`, `false`
+
+**Examples:**
+| Expression | Meaning |
+|-----------|---------|
+| `status == "failed"` | Notify only on failure |
+| `healthy != true` | Notify when not healthy |
+| `disk_usage == "90%"` | Notify at exact threshold |
+| `exit_code != 0` | Notify on non-zero exit |
+
+**Evaluation logic:**
+1. After script execution, load persisted context
+2. If `when` is set, evaluate expression against context
+3. If expression is true → send notification
+4. If expression is false → skip notification, log "notification suppressed by when condition"
+5. If key not found in context → treat as false (fail-safe: don't notify on missing data)
+
+**Why NOT support `and`/`or`:**
+- Adds parser complexity (operator precedence, nesting)
+- 90% of use cases are single-condition
+- Complex conditions belong in the script itself (script outputs `should_notify: true`)
+- PROJECT.md explicitly scopes: "仅支持 == / != 简单判断"
+
+**Implementation:**
+- Add `when: str | None = None` to `NotifyConfig` dataclass
+- New function: `evaluate_when(when_expr: str, context: dict) -> bool`
+- Parse with simple regex: `r'(\w+)\s*(==|!=)\s*(.+)'`
+- Call in `execute_task_with_notify()` before `notifier.notify_task_result()`
+
+**Complexity:** LOW — simple string parsing, < 30 lines of code.
+
+---
+
+## MVP Recommendation
+
+### Build First (Core Context Loop)
+
+These form the essential feedback loop: inject context → script runs → output context → persist → notify conditionally.
+
+1. **Environment variable injection** — LOW complexity, enables all other features
+2. **Template variable injection** — LOW complexity, extends existing pattern
+3. **JSON stdout context feedback** — MEDIUM complexity, core feedback mechanism
+4. **Task state persistence** — MEDIUM complexity, required for context to survive across runs
+5. **Conditional notification (when)** — LOW complexity, the key user-facing value
+
+### Build Second (Enhanced Context)
+
+6. **Context file injection** — MEDIUM complexity, for scripts that prefer file-based input
+
+### Defer
+
+- Cross-task context sharing (v4+)
+- Complex condition expressions (and/or)
+- Context history/versioning
+- Agent-type context feedback
+
+---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| 微信通道基础实现 | HIGH | MEDIUM | P1 |
-| capture 交互式增强 | MEDIUM | LOW | P1 |
-| add 后自动 capture | MEDIUM | LOW | P1 |
-| 微信 Markdown 消息 | MEDIUM | MEDIUM | P2 |
-| capture 微信用户标识 | HIGH | HIGH | P2 |
-| 微信图片/文件消息 | LOW | MEDIUM | P3 |
-| 微信模板卡片消息 | LOW | HIGH | P3 |
-| 自动 userid 映射 | MEDIUM | HIGH | P3 |
+| Feature | User Value | Implementation Cost | Phase Priority | Category |
+|---------|------------|---------------------|---------------|----------|
+| Environment variable injection | HIGH | LOW | P1 | Context Injection |
+| Template variable injection | MEDIUM | LOW | P1 | Context Injection |
+| JSON stdout context feedback | HIGH | MEDIUM | P1 | Context Feedback |
+| Task state persistence | HIGH | MEDIUM | P1 | State Persistence |
+| Conditional notification (when) | HIGH | LOW | P1 | Conditional Notification |
+| Context file injection | MEDIUM | MEDIUM | P2 | Context Injection |
 
-**Priority key:**
-- P1: Must have for v2.4 milestone
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+---
 
-## Competitor Feature Analysis
+## Comparison: Context Feedback Approaches
 
-| Feature | QQ Bot | 飞书 | 企业微信 | 我们的实现 |
-|---------|--------|------|---------|-----------|
-| 配置方式 | app_id + client_secret | app_id + app_secret | corp_id + agent_id + secret | 统一交互式配置 |
-| 用户标识 | openid (WebSocket) | open_id (WebSocket) | userid (WebSocket/回调) | capture 命令获取 |
-| 消息类型 | text, markdown | text, markdown, card | text, markdown, card, image, file | text, markdown (基础) |
-| 私聊支持 | ✅ | ✅ | ✅ | ✅ (应用消息 API) |
-| 群聊支持 | ✅ | ✅ | ✅ (webhook) | ❌ (仅私聊，避免 webhook 安全风险) |
-| Markdown | 基础 | 完整 | markdown_v2 | 按通道能力适配 |
+| Approach | Used By | Pros | Cons | Verdict |
+|----------|---------|------|------|---------|
+| **JSON on stdout (last line)** | Custom | Simple, no file protocol, works with any language | Mixed output can confuse parsing | **Recommended** — simplest for CLI scripts |
+| File write (`$CLAW_OUTPUT`) | GitHub Actions | Robust, no parsing ambiguity | Two protocols (env + file), harder to learn | Rejected — adds unnecessary complexity |
+| Key-value on stdout (`::set-output`) | GitHub Actions (deprecated) | Familiar to Actions users | Deprecated for a reason — fragile | Rejected — GitHub itself moved away from this |
+| Exit code only | crontab | Universal | Too limited (only 0/non-zero) | Insufficient — users need richer data |
+| Stderr for metadata | Some tools | Separates data from output | Non-standard, confusing | Rejected — stderr is for errors |
+
+---
 
 ## Sources
 
-- **企业微信官方文档 (HIGH confidence):**
-  - 发送应用消息: https://developer.work.weixin.qq.com/document/path/90236
-  - 消息推送配置: https://developer.work.weixin.qq.com/document/path/91770
-  - 消息类型：text, image, voice, video, file, textcard, news, mpnews, markdown, miniprogram_notice, template_card
+- **GitHub Actions documentation (HIGH confidence):**
+  - Workflow commands: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands
+  - Variables: https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-variables
+  - Key pattern: `GITHUB_OUTPUT` file write, `GITHUB_ENV` file write, `steps.<id>.outputs.<name>` reference
 
-- **项目现有实现 (HIGH confidence):**
-  - QQ Bot 通道: `src/claw_cron/channels/qqbot.py` — WebSocket 捕获 openid
-  - 飞书通道: `src/claw_cron/channels/feishu.py` — WebSocket 捕获 open_id
-  - channels 命令: `src/claw_cron/cmd/channels.py` — 配置、验证、捕获流程
-  - prompt 工具: `src/claw_cron/prompt.py` — InquirerPy 交互式选择
+- **Airflow XCom documentation (HIGH confidence):**
+  - XComs: https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html
+  - Key pattern: `xcom_push(key, value)` / `xcom_pull(task_ids, key)`, auto `return_value`, database backend, pluggable storage
 
-- **Web 搜索 (MEDIUM confidence):**
-  - 企业微信机器人功能详解 (2025): https://www.sohu.com/a/1010447425_122472236
-  - 企业微信应用消息发送 Python 实践: https://blog.csdn.net/m0_65003953/article/details/144514272
+- **Crontab environment variables (HIGH confidence):**
+  - https://cronitor.io/guides/cron-environment-variables
+  - Key pattern: env vars declared in crontab file, limited env by default
+
+- **Claw-cron existing codebase (HIGH confidence):**
+  - `executor.py`: subprocess.run with capture_output, no env injection yet
+  - `notifier.py`: NotifyConfig with channel + recipients, no `when` field
+  - `storage.py`: Task dataclass, YAML-based, no context storage
+  - `scheduler.py`: cron matching + thread-based execution
+
+- **Web search (MEDIUM confidence):**
+  - Rundeck data passing: https://github.com/rundeck/rundeck/issues/116 (Export Var step)
+  - SaltStack context: Pillar/Grains/SLS pattern for stateful execution
 
 ---
-*Feature research for: claw-cron v2.4 微信通道 & Capture 增强*
+*Feature research for: claw-cron v3.0 Command Context Mechanism*
 *Researched: 2026-04-17*

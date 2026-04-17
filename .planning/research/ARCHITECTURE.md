@@ -1,564 +1,740 @@
-# Architecture Research: 微信通道 & Capture 增强
+# Architecture Research: Command Task Context Mechanism
 
-**Domain:** Message Channel Extension
-**Researched:** 2026-04-17
-**Confidence:** HIGH
+**Domain:** CLI cron task manager — bidirectional context for command-type tasks
+**Researched:** 2025-07-11
+**Confidence:** HIGH (based on direct codebase analysis, no speculation)
 
-## 现有架构分析
+## Current Architecture (v2.4)
 
-### 系统概览
+### System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          CLI Layer                               │
-│  claw-cron channels [add|list|delete|capture|verify]             │
+│                         CLI Layer (cli.py)                       │
+│  add / list / run / start / delete / channel / config ...       │
 ├─────────────────────────────────────────────────────────────────┤
-│                      Command Layer                               │
-│  src/claw_cron/cmd/channels.py                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │ add()        │  │ capture()    │  │ verify()     │           │
-│  └──────┬───────┘  └──────┬───────┘  └──────────────┘           │
-│         │                 │                                      │
-├─────────┴─────────────────┴──────────────────────────────────────┤
-│                     Channel Abstraction                          │
-│  src/claw_cron/channels/                                         │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ MessageChannel (ABC)                                     │   │
-│  │  - channel_id: str                                       │   │
-│  │  - send_text(recipient, content) → MessageResult         │   │
-│  │  - send_markdown(recipient, content) → MessageResult     │   │
-│  │  - health_check() → bool                                 │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│         ↑             ↑             ↑             ↑             │
-│  ┌──────┴──────┐ ┌────┴─────┐ ┌─────┴──────┐ ┌────┴─────┐       │
-│  │ IMessage    │ │ QQBot    │ │ Feishu     │ │ Email    │       │
-│  │ Channel     │ │ Channel  │ │ Channel    │ │ Channel  │       │
-│  └─────────────┘ └──────────┘ └────────────┘ └──────────┘       │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ CHANNEL_REGISTRY: dict[str, type[MessageChannel]]        │   │
-│  │ get_channel(channel_id) → MessageChannel instance        │   │
-│  │ get_channel_status(channel_id) → (icon, text)           │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│                     Scheduler (scheduler.py)                     │
+│  Per-minute loop → cron_matches() → Thread(run_task_with_notify)│
+├──────────────────┬──────────────────────┬───────────────────────┤
+│   Executor       │    Notifier          │    Storage            │
+│ (executor.py)    │  (notifier.py)       │  (storage.py)        │
+│                  │                      │                       │
+│ execute_task()   │  NotifyConfig        │  Task dataclass       │
+│   subprocess.run │  Notifier.notify()   │  load_tasks()         │
+│   → (code, out)  │  render_message()    │  save_tasks()         │
+│                  │                      │  update_task()        │
+├──────────────────┴──────────────────────┴───────────────────────┤
+│                    Channels (channels/)                          │
+│  IMessageChannel / QQBotChannel / EmailChannel / FeishuChannel  │
 ├─────────────────────────────────────────────────────────────────┤
-│                     Configuration Layer                          │
-│  ~/.config/claw-cron/config.yaml                                 │
-│  channels:                                                       │
-│    qqbot: { app_id, client_secret, enabled, created_at }        │
-│    feishu: { app_id, app_secret, enabled, created_at }          │
-│    wechat: { corp_id, agent_id, secret, enabled, created_at }   │
-├─────────────────────────────────────────────────────────────────┤
-│                        Storage Layer                             │
-│  ~/.config/claw-cron/contacts.yaml                               │
-│  contacts:                                                       │
-│    me: { openid, channel, alias, created }                      │
+│              YAML Storage (~/.config/claw-cron/)                 │
+│  tasks.yaml (task configs)  │  config.yaml (channel + AI cfg)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 组件职责
+### Current Data Flow (command type)
 
-| 组件 | 职责 | 实现方式 |
-|------|------|----------|
-| `MessageChannel` | 通道抽象接口，定义统一发送 API | ABC + @abstractmethod |
-| `CHANNEL_REGISTRY` | 通道注册表，支持动态发现 | dict[channel_id, channel_class] |
-| `get_channel()` | 通道工厂函数 | 根据 channel_id 实例化通道 |
-| `get_channel_status()` | 配置状态检查 | 读取 config.yaml，验证必填字段 |
-| `channels.py` | CLI 命令组 | Click + InquirerPy 交互 |
-| `prompt_channel_select()` | 通道选择交互 | 从 CHANNEL_REGISTRY 构建选项列表 |
-
-## 1. WechatChannel 实现要点
-
-### 1.1 继承 MessageChannel 的方法
-
-**必须实现:**
-```python
-class WechatChannel(MessageChannel):
-    @property
-    def channel_id(self) -> str:
-        return "wechat"
-
-    async def send_text(self, recipient: str, content: str) -> MessageResult:
-        # 企业微信消息发送 API
-        pass
-
-    async def send_markdown(self, recipient: str, content: str) -> MessageResult:
-        # 企业微信支持 markdown，直接发送
-        pass
+```
+scheduler.py: cron_matches()
+    → threading.Thread(run_task_with_notify, task)
+        → executor.py: execute_task(task)
+            → subprocess.run(task.script, shell=True, capture_output=True, text=True)
+            → return (exit_code, stdout+stderr)
+        → executor.py: execute_task_with_notify(task)
+            → exit_code, output = execute_task(task)
+            → if task.notify: Notifier.notify_task_result(task, exit_code, output)
+            → return exit_code
 ```
 
-**可选实现:**
+### Current Task Dataclass
+
 ```python
-    async def health_check(self) -> bool:
-        # 验证 access_token 是否有效
-        pass
-```
-
-### 1.2 新增配置项
-
-**WechatConfig (企业微信应用):**
-```python
-class WechatConfig(BaseSettings, ChannelConfig):
-    corp_id: str | None = Field(
-        default=None,
-        description="企业 ID from work.weixin.qq.com"
-    )
-    agent_id: str | None = Field(
-        default=None,
-        description="应用 AgentId"
-    )
-    secret: str | None = Field(
-        default=None,
-        description="应用 Secret"
-    )
-
-    class Config:
-        env_prefix = "CLAW_CRON_WECHAT_"
-```
-
-**config.yaml 结构:**
-```yaml
-channels:
-  wechat:
-    corp_id: "ww1234567890abcdef"
-    agent_id: "1000001"
-    secret: "abc123..."
-    enabled: true
-    created_at: "2026-04-17T10:00:00"
-```
-
-### 1.3 Recipient 格式
-
-**企业微信用户标识:**
-- `touser`: 成员 UserID（企业通讯录中的账号）
-- 格式: 直接使用 UserID，如 `"wxnacy"`
-- 或使用别名: `"c2c:wxnacy"` (与其他通道保持一致)
-
-**与 QQ/Feishu 的差异:**
-| 通道 | 用户标识 | 来源 |
-|------|---------|------|
-| QQ Bot | openid (bot-specific) | 需 WebSocket 捕获 |
-| Feishu | open_id (bot-specific) | 需 WebSocket 捕获 |
-| Wechat | UserID (企业通讯录) | **已知，无需捕获** |
-
-**关键差异:** 企业微信不需要 capture 流程！UserID 在企业通讯录中已知。
-
-### 1.4 Token 管理
-
-**企业微信 access_token:**
-```python
+# storage.py — line 22
 @dataclass
-class WechatTokenInfo:
-    access_token: str
-    expires_at: float  # 7200s 有效期
-
-async def _get_access_token(self) -> str:
-    # 缓存逻辑类似 QQBot
-    # API: https://qyapi.weixin.qq.com/cgi-bin/gettoken
-    #      ?corpid=CORPID&corpsecret=SECRET
-    pass
+class Task:
+    name: str
+    cron: str
+    type: str                              # "command" | "agent" | "reminder"
+    script: str | None = None              # Shell command (command type)
+    prompt: str | None = None              # AI prompt (agent type)
+    client: str | None = None              # AI client (agent type)
+    client_cmd: str | None = None          # Command template override
+    enabled: bool = True
+    notify: NotifyConfig | None = None     # channel + recipients
+    message: str | None = None             # Reminder message
 ```
 
-### 1.5 消息发送 API
-
-**企业微信发送消息:**
-```python
-async def send_text(self, recipient: str, content: str) -> MessageResult:
-    token = await self._get_access_token()
-    # API: https://qyapi.weixin.qq.com/cgi-bin/message/send
-    payload = {
-        "touser": recipient,
-        "msgtype": "text",
-        "agentid": self.config.agent_id,
-        "text": {"content": content}
-    }
-    # POST with access_token parameter
-    pass
-```
-
-## 2. Capture 交互改进
-
-### 2.1 现有 Capture 流程分析
-
-**QQ Bot Capture:**
-```
-channels capture --channel-type qqbot --alias me
-    ↓
-WebSocket 连接 → 等待用户发消息 → 提取 openid → 保存为 Contact
-```
-
-**Feishu Capture:**
-```
-channels capture --channel-type feishu --alias me
-    ↓
-lark.ws.Client → 等待用户发消息 → 提取 open_id → 保存为 Contact
-```
-
-**iMessage/Email:** 无需 capture (已知标识)
-
-### 2.2 统一不同通道的 Capture 流程
-
-**方案 A: 通道声明 capture 能力 (推荐)**
+### Current NotifyConfig
 
 ```python
-class MessageChannel(ABC):
-    @property
-    def supports_capture(self) -> bool:
-        """通道是否支持 capture 流程"""
-        return False
-
-    async def capture_openid(self, alias: str) -> str | None:
-        """捕获用户 openid (仅支持 capture 的通道实现)"""
-        raise NotImplementedError(
-            f"{self.channel_id} does not support capture"
-        )
+# notifier.py — line 43
+@dataclass
+class NotifyConfig:
+    channel: str                           # "imessage", "qqbot", etc.
+    recipients: list[str] = field(default_factory=list)
 ```
 
-**实现示例:**
+### Key Integration Points
+
+| Point | File | Line(s) | Current Behavior |
+|-------|------|---------|------------------|
+| subprocess invocation | `executor.py` | L80 | `subprocess.run(cmd, shell=True, capture_output=True, text=True)` — no `env` parameter |
+| Output handling | `executor.py` | L83-87 | Concatenates stdout+stderr into single string |
+| Task persistence | `storage.py` | L91-92 | `yaml.dump({"tasks": [asdict(t) for t in tasks]})` — flat serialize |
+| Notify trigger | `executor.py` | L108 | Always notifies if `task.notify` is set — no conditional logic |
+| NotifyConfig parse | `notifier.py` | L65-83 | `from_dict()` reads only `channel` and `recipients` |
+| Template rendering | `notifier.py` | L86-109 | `render_message()` only supports `{{ date }}` and `{{ time }}` |
+| Scheduler loop | `scheduler.py` | L97-113 | Loads tasks fresh each minute, no state carried between loops |
+
+---
+
+## Proposed Architecture (v3.0 Context Mechanism)
+
+### New System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLI Layer (cli.py)                       │
+├─────────────────────────────────────────────────────────────────┤
+│                     Scheduler (scheduler.py)                     │
+│  Per-minute loop → cron_matches() → Thread(run_task_with_notify)│
+├──────────┬──────────┬──────────────┬────────────┬───────────────┤
+│ Executor │ Notifier │  Context     │  Storage   │  Context      │
+│(executor)│(notifier)│  Injector    │ (storage)  │  Store        │
+│          │          │ (NEW)        │ (MODIFIED) │  (NEW)        │
+├──────────┴──────────┴──────────────┴────────────┴───────────────┤
+│                    Channels (channels/)                          │
+├─────────────────────────────────────────────────────────────────┤
+│              YAML Storage (~/.config/claw-cron/)                 │
+│  tasks.yaml  │  config.yaml  │  contexts/ (NEW)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### New Data Flow (command type with context)
+
+```
+1. LOAD CONTEXT
+   context_store.load(task.name)
+       → dict of persisted context from previous run
+       → {} if no previous context
+
+2. INJECT CONTEXT
+   context_injector.build_env(task, context)
+       → env dict for subprocess.run(env=...)
+       → Includes CLAW_CONTEXT_* env vars + template var resolution
+   context_injector.render_script(task, context)
+       → Replace {{ var }} placeholders in task.script
+   context_injector.write_context_file(task, context)
+       → Write JSON to ~/.config/claw-cron/contexts/{name}.json
+
+3. EXECUTE
+   subprocess.run(rendered_script, shell=True, env=env, capture_output=True, text=True)
+       → (exit_code, stdout, stderr)
+
+4. PARSE OUTPUT
+   context_parser.parse(stdout)
+       → Try JSON parse on stdout lines
+       → If valid JSON: extract {"context": {...}, "output": "..."}
+       → If not JSON: context=None, output=raw stdout
+       → Always preserve stderr in logs
+
+5. PERSIST CONTEXT
+   if context_parser found JSON context:
+       context_store.save(task.name, new_context)
+       → Merge with existing context? Or replace? → REPLACE (simpler, predictable)
+
+6. EVALUATE WHEN
+   if task.notify and task.notify.when:
+       should_notify = evaluate_when(task.notify.when, context)
+       → Simple expressions: "status == changed", "count != 0"
+   else:
+       should_notify = True  (default: always notify)
+
+7. NOTIFY
+   if should_notify:
+       Notifier.notify_task_result(task, exit_code, output)
+   else:
+       logger.info(f"Notification suppressed for '{task.name}': when condition not met")
+```
+
+---
+
+## Component Design
+
+### 1. NEW: `context.py` — Context Injection & Parsing
+
+**File:** `src/claw_cron/context.py`
+**Purpose:** Three injection paths + stdout JSON parsing
+
 ```python
-class QQBotChannel(MessageChannel):
-    @property
-    def supports_capture(self) -> bool:
+"""Context injection and parsing for command-type tasks."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from claw_cron.storage import Task
+
+CONTEXT_DIR = Path.home() / ".config" / "claw-cron" / "contexts"
+
+
+def load_context(task_name: str) -> dict[str, Any]:
+    """Load persisted context for a task from contexts/{name}.json."""
+    path = CONTEXT_DIR / f"{task_name}.json"
+    if not path.exists():
+        return {}
+    with path.open() as f:
+        return json.load(f)
+
+
+def save_context(task_name: str, context: dict[str, Any]) -> None:
+    """Persist context to contexts/{name}.json."""
+    CONTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    path = CONTEXT_DIR / f"{task_name}.json"
+    with path.open("w") as f:
+        json.dump(context, f, ensure_ascii=False, indent=2)
+
+
+def build_env(task: Task, context: dict[str, Any]) -> dict[str, str]:
+    """Build environment variables dict for subprocess.run().
+
+    Injects context as CLAW_CONTEXT_{KEY}=value env vars.
+    Merges with current process environment (inherit + override).
+    """
+    env = os.environ.copy()
+    for key, value in context.items():
+        env_key = f"CLAW_CONTEXT_{key.upper()}"
+        env[env_key] = str(value)
+    return env
+
+
+def render_script(task: Task, context: dict[str, Any]) -> str:
+    """Replace {{ var }} placeholders in task.script with context values.
+
+    Also supports {{ date }} and {{ time }} from render_message().
+    """
+    from claw_cron.notifier import render_message
+    script = task.script or ""
+    # First: render date/time variables
+    script = render_message(script)
+    # Then: render context variables
+    for key, value in context.items():
+        script = script.replace(f"{{{{ {key} }}}}", str(value))
+    return script
+
+
+def write_context_file(task: Task, context: dict[str, Any]) -> Path:
+    """Write context as JSON file for scripts that prefer file-based input.
+
+    Writes to ~/.config/claw-cron/contexts/{name}_input.json
+    Returns the path so it can be injected as CLAW_CONTEXT_FILE env var.
+    """
+    CONTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    path = CONTEXT_DIR / f"{task.name}_input.json"
+    with path.open("w") as f:
+        json.dump(context, f, ensure_ascii=False, indent=2)
+    return path
+
+
+def parse_stdout(stdout: str) -> tuple[dict[str, Any] | None, str]:
+    """Parse JSON context from stdout.
+
+    Strategy:
+      1. If entire stdout is valid JSON → use it as context, output = json.dumps(parsed)
+      2. If last non-empty line is valid JSON → context from that line, output = everything before
+      3. If no JSON found → context=None, output=raw stdout
+
+    Returns:
+        (context_dict_or_None, display_output)
+    """
+    if not stdout or not stdout.strip():
+        return None, stdout
+
+    # Strategy 1: entire stdout is JSON
+    try:
+        parsed = json.loads(stdout.strip())
+        if isinstance(parsed, dict):
+            # Check if it has a "context" key wrapping
+            if "context" in parsed and isinstance(parsed["context"], dict):
+                output = parsed.get("output", json.dumps(parsed["context"], ensure_ascii=False))
+                return parsed["context"], output
+            # The entire dict IS the context
+            return parsed, json.dumps(parsed, ensure_ascii=False)
+    except json.JSONDecodeError:
+        pass
+
+    # Strategy 2: last line is JSON
+    lines = stdout.strip().splitlines()
+    if len(lines) > 1:
+        try:
+            parsed = json.loads(lines[-1].strip())
+            if isinstance(parsed, dict):
+                output = "\n".join(lines[:-1])
+                if "context" in parsed and isinstance(parsed["context"], dict):
+                    return parsed["context"], output or parsed.get("output", "")
+                return parsed, output
+        except json.JSONDecodeError:
+            pass
+
+    # Strategy 3: no JSON
+    return None, stdout
+```
+
+**Key Design Decisions:**
+- `build_env()` inherits current `os.environ` and adds `CLAW_CONTEXT_*` overrides — scripts can use all normal env vars plus injected ones
+- `render_script()` reuses existing `render_message()` for date/time, then adds context variable replacement
+- `parse_stdout()` uses three strategies with graceful fallback — scripts that don't output JSON work fine, scripts that do get context extraction
+- Context files written to separate `contexts/` directory, not mixed into `tasks.yaml`
+
+### 2. NEW: `when_eval.py` — Conditional Notification Evaluation
+
+**File:** `src/claw_cron/when_eval.py`
+**Purpose:** Evaluate simple `when` expressions against context
+
+```python
+"""Simple when-condition evaluator for conditional notifications."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+
+def evaluate_when(when_expr: str, context: dict[str, Any]) -> bool:
+    """Evaluate a simple when expression against context.
+
+    Supported formats:
+        "key == value"   → True if context[key] equals value
+        "key != value"   → True if context[key] does not equal value
+
+    Rules:
+        - Key must exist in context for == to be True (missing key → False)
+        - Key must NOT exist in context for != to be True (missing key → True for !=)
+        - Values are compared as strings (context values are str()'d)
+        - Whitespace around operator and values is trimmed
+
+    Args:
+        when_expr: Simple expression like "status == changed"
+        context: Context dict from task execution output
+
+    Returns:
+        True if condition is met, False otherwise.
+    """
+    # Match: key op value
+    match = re.match(r"^\s*(\w+)\s*(==|!=)\s*(.+?)\s*$", when_expr)
+    if not match:
+        # Invalid expression — default to True (don't suppress notifications on bad syntax)
         return True
 
-    async def capture_openid(self, alias: str) -> str | None:
-        # WebSocket capture 逻辑
-        pass
+    key, op, value = match.groups()
 
-class IMessageChannel(MessageChannel):
-    @property
-    def supports_capture(self) -> bool:
-        return False  # iMessage 使用电话号码/邮箱，无需 capture
+    if op == "==":
+        if key not in context:
+            return False
+        return str(context[key]) == value
+    elif op == "!=":
+        if key not in context:
+            return True  # Key missing means it's definitely != value
+        return str(context[key]) != value
 
-class WechatChannel(MessageChannel):
-    @property
-    def supports_capture(self) -> bool:
-        return False  # 企业微信使用已知 UserID，无需 capture
+    return True  # Unknown operator — don't suppress
 ```
 
-**capture 命令改进:**
+**Key Design Decisions:**
+- Missing key + `==` → `False` (can't equal something that doesn't exist)
+- Missing key + `!=` → `True` (absence is inequality)
+- Invalid expression → `True` (fail-open: don't suppress notifications on bad syntax, log a warning instead)
+- String comparison only — keeps it simple, matches PROJECT.md constraint of `==` / `!=` only
+
+### 3. MODIFIED: `storage.py` — Task Dataclass Changes
+
+**Changes to Task dataclass:**
+
 ```python
-@channels.command()
-@click.option("--channel-type", type=click.Choice(["qqbot", "feishu"]))
-@click.option("--alias", default="me")
-def capture(channel_type: str, alias: str) -> None:
-    channel = get_channel(channel_type)
-
-    if not channel.supports_capture:
-        console.print(f"[yellow]{channel_type} 不需要 capture 流程[/yellow]")
-        console.print(f"[dim]直接使用已知标识符发送消息[/dim]")
-        return
-
-    openid = await channel.capture_openid(alias)
-    if openid:
-        save_contact(Contact(openid=openid, channel=channel_type, alias=alias))
+@dataclass
+class Task:
+    name: str
+    cron: str
+    type: str
+    script: str | None = None
+    prompt: str | None = None
+    client: str | None = None
+    client_cmd: str | None = None
+    enabled: bool = field(default=True)
+    notify: NotifyConfig | None = None
+    message: str | None = None
+    # NEW: context injection configuration
+    context_inject: str | None = None  # "env" | "template" | "file" | "all" (default: None = no injection)
 ```
 
-### 2.3 验证后自动触发 Capture
+**Why `context_inject` field instead of a new dataclass:**
+- Only one new field — a nested dataclass would be over-engineering for v3.0
+- `None` means "no context injection" — backward compatible with existing tasks
+- String enum: `"env"`, `"template"`, `"file"`, `"all"` — explicit and self-documenting
+- Can evolve to a `ContextConfig` dataclass in future if more options are needed
 
-**当前 add 命令流程:**
-```python
-@channels.command()
-@click.option("--capture-openid", is_flag=True)
-def add(capture_openid: bool) -> None:
-    # 1. 选择通道类型
-    # 2. 输入凭证
-    # 3. 验证凭证
-    # 4. 保存配置
-    if capture_openid:
-        # 手动触发 capture
-        asyncio.run(_capture_qqbot_openid(alias="me"))
+**YAML serialization impact:**
+- `asdict(task)` already handles `None` fields → they serialize as `null` in YAML
+- `_task_from_dict()` already handles `Task(**raw)` → new field with default `None` is backward compatible
+- No migration needed for existing `tasks.yaml` files
+
+**YAML example (new task with context):**
+
+```yaml
+- name: disk-check
+  cron: "0 8 * * *"
+  type: command
+  script: "check-disk.sh"
+  context_inject: env
+  notify:
+    channel: qqbot
+    recipients:
+      - c2c:ABC123
+    when: "status == warning"
 ```
 
-**改进方案:**
+### 4. MODIFIED: `notifier.py` — NotifyConfig Changes
 
-**方案 B: 验证成功后自动询问 (推荐)**
+**Changes to NotifyConfig dataclass:**
 
 ```python
-@channels.command()
-@click.option("--capture-openid", is_flag=True, default=None)
-def add(capture_openid: bool | None) -> None:
-    # ... 验证凭证并保存 ...
+@dataclass
+class NotifyConfig:
+    channel: str
+    recipients: list[str] = field(default_factory=list)
+    when: str | None = None  # NEW: conditional expression, e.g. "status == warning"
+```
 
-    # 检查通道是否需要 capture
-    channel = get_channel(channel_type)
+**Changes to `from_dict()`:**
 
-    if channel.supports_capture:
-        if capture_openid is None:
-            # 未指定 --capture-openid，询问用户
-            do_capture = prompt_confirm(
-                "是否立即获取用户 OpenID?",
-                default=True
-            )
-        else:
-            do_capture = capture_openid
+```python
+@classmethod
+def from_dict(cls, data: dict[str, Any]) -> NotifyConfig:
+    return cls(
+        channel=data.get("channel", ""),
+        recipients=data.get("recipients", []),
+        when=data.get("when"),  # NEW
+    )
+```
 
-        if do_capture:
-            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
-            asyncio.run(_capture_openid(channel_type, alias="me"))
+**Impact on `asdict()` serialization:**
+- `asdict()` will include `when: null` for tasks without it — harmless
+- Backward compatible: old YAML files without `when` key work fine
+
+### 5. MODIFIED: `executor.py` — Integration of Context Flow
+
+**Changes to `execute_task()`:**
+
+```python
+def execute_task(task: Task) -> tuple[int, str, dict[str, Any] | None]:
+    """Execute a task and return (exit_code, output, context).
+
+    CHANGED: Return type now includes optional context dict.
+    """
+    log_path = _task_log_path(task.name)
+    ts_start = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if task.type == "reminder":
+        # ... unchanged, return (0, message, None)
+        message = render_message(task.message or "")
+        # ... log ...
+        return 0, message, None
+
+    if task.type == "command":
+        # NEW: Context injection
+        from claw_cron.context import (
+            build_env, load_context, parse_stdout,
+            render_script, write_context_file,
+        )
+
+        context = load_context(task.name) if task.context_inject else {}
+        cmd = render_script(task, context) if task.context_inject in ("template", "all") else (task.script or "")
+
+        env = None  # Default: inherit os.environ without override
+        if task.context_inject in ("env", "all"):
+            env = build_env(task, context)
+            # Also set CLAW_CONTEXT_FILE if file injection requested
+        if task.context_inject in ("file", "all"):
+            ctx_path = write_context_file(task, context)
+            if env is None:
+                env = os.environ.copy()
+            env["CLAW_CONTEXT_FILE"] = str(ctx_path)
+    elif task.type == "agent":
+        # ... unchanged agent logic ...
+        cmd = ...
+        env = None
     else:
-        console.print(f"[dim]{channel_type} 无需 capture，直接使用已知标识符[/dim]")
+        raise ValueError(f"Unknown task type: {task.type!r}")
+
+    _write_log(log_path, f"[{ts_start}] START: {task.name}\n")
+
+    # CHANGED: Pass env parameter
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=env)
+
+    ts_end = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # NEW: Parse stdout for context
+    new_context = None
+    if task.type == "command" and task.context_inject:
+        new_context, display_output = parse_stdout(result.stdout)
+        output = display_output
+        if result.stderr:
+            output += result.stderr
+    else:
+        output = ""
+        if result.stdout:
+            output += result.stdout
+        if result.stderr:
+            output += result.stderr
+
+    # NEW: Persist context
+    if new_context is not None:
+        from claw_cron.context import save_context
+        save_context(task.name, new_context)
+
+    _write_log(log_path, f"{output}[{ts_end}] END (exit_code={result.returncode})\n\n")
+
+    return result.returncode, output, new_context
 ```
 
-**优化点:**
-1. 自动判断是否需要 capture (`channel.supports_capture`)
-2. 未指定 flag 时询问用户，而非强制手动指定
-3. 不支持 capture 的通道给出友好提示
-
-### 2.4 Capture 实现统一接口
-
-**重构 capture 实现:**
+**Changes to `execute_task_with_notify()`:**
 
 ```python
-async def _capture_openid(channel_type: str, alias: str) -> None:
-    """统一的 capture 入口"""
-    config = load_config()
-    channel_config = config.get("channels", {}).get(channel_type, {})
+async def execute_task_with_notify(task: Task) -> int:
+    exit_code, output, context = execute_task(task)  # CHANGED: unpack 3 values
 
-    channel = get_channel(channel_type, config=channel_config)
+    if task.notify:
+        # NEW: Evaluate when condition
+        should_notify = True
+        if task.notify.when and context is not None:
+            from claw_cron.when_eval import evaluate_when
+            should_notify = evaluate_when(task.notify.when, context)
+            if not should_notify:
+                logger.info(
+                    f"Notification suppressed for '{task.name}': "
+                    f"when '{task.notify.when}' not met"
+                )
 
-    try:
-        openid = await channel.capture_openid(alias)
-        if openid:
-            contact = Contact(
-                openid=openid,
-                channel=channel_type,
-                alias=alias,
-                created=datetime.now().isoformat(),
-            )
-            save_contact(contact)
-            console.print(f"[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
-    except NotImplementedError:
-        console.print(f"[yellow]{channel_type} 不支持 capture[/yellow]")
-    except Exception as e:
-        console.print(f"[red]Capture failed: {e}[/red]")
-        raise SystemExit(1)
+        if should_notify:
+            try:
+                notifier = Notifier()
+                results = await notifier.notify_task_result(task, exit_code, output)
+                # ... existing error handling ...
+            except Exception as e:
+                logger.error(...)
+
+    return exit_code
 ```
 
-**通道特定实现移入 Channel 类:**
+**Breaking change:** `execute_task()` return type changes from `tuple[int, str]` to `tuple[int, str, dict[str, Any] | None]`.
+
+**Callers affected:**
+- `execute_task_with_notify()` — updated (shown above)
+- Any CLI commands that call `execute_task()` directly — must handle 3-tuple return
+- **Search needed for all callers** before implementation
+
+### 6. MODIFIED: `notifier.py` — Template Enhancement (Optional)
+
+**Enhancement to `render_message()`:** Add `{{ task_name }}` and context variable support.
+
 ```python
-class QQBotChannel(MessageChannel):
-    async def capture_openid(self, alias: str) -> str | None:
-        # 原 _capture_qqbot_openid 逻辑
-        # WebSocket 连接 → 等待消息 → 返回 openid
-        pass
-
-class FeishuChannel(MessageChannel):
-    async def capture_openid(self, alias: str) -> str | None:
-        # 原 _capture_feishu_openid 逻辑
-        # lark.ws.Client → 等待消息 → 返回 openid
-        pass
+def render_message(template: str, context: dict[str, Any] | None = None) -> str:
+    now = datetime.now()
+    result = (
+        template.replace("{{ date }}", now.strftime("%Y-%m-%d"))
+        .replace("{{ time }}", now.strftime("%H:%M:%S"))
+    )
+    # Context variables
+    if context:
+        for key, value in context.items():
+            result = result.replace(f"{{{{ {key} }}}}", str(value))
+    return result
 ```
 
-## 3. 建议的实现顺序
+---
 
-### Phase 1: 架构增强 (新建基础)
+## File Change Summary
 
-**优先级:** 高 (为后续功能提供基础)
+| File | Action | Scope | Description |
+|------|--------|-------|-------------|
+| `src/claw_cron/context.py` | **NEW** | Full file | Context loading, injection (env/template/file), stdout parsing, persistence |
+| `src/claw_cron/when_eval.py` | **NEW** | Full file | Simple `==`/`!=` expression evaluator |
+| `src/claw_cron/storage.py` | **MODIFY** | Task dataclass | Add `context_inject: str \| None = None` field |
+| `src/claw_cron/notifier.py` | **MODIFY** | NotifyConfig dataclass | Add `when: str \| None = None` field + `from_dict()` update |
+| `src/claw_cron/executor.py` | **MODIFY** | `execute_task()` + `execute_task_with_notify()` | Context injection, JSON parsing, when evaluation |
+| `src/claw_cron/notifier.py` | **MODIFY** | `render_message()` | Add context variable support (optional) |
 
-**任务:**
-1. **MessageChannel 增加 capture 支持**
-   - 新增 `supports_capture` 属性
-   - 新增 `capture_openid()` 方法 (默认 raise NotImplementedError)
-
-2. **重构现有通道实现**
-   - QQBotChannel 实现 `capture_openid()`
-   - FeishuChannel 实现 `capture_openid()`
-   - IMessageChannel/EmailChannel 设置 `supports_capture = False`
-
-3. **统一 capture 命令逻辑**
-   - 提取 `_capture_openid()` 为通用入口
-   - 移除通道特定的 `_capture_qqbot_openid` / `_capture_feishu_openid`
-
-**文件修改:**
-- `src/claw_cron/channels/base.py` (新增属性和方法)
-- `src/claw_cron/channels/qqbot.py` (实现 capture_openid)
-- `src/claw_cron/channels/feishu.py` (实现 capture_openid)
-- `src/claw_cron/channels/imessage.py` (设置 supports_capture)
-- `src/claw_cron/channels/email.py` (设置 supports_capture)
-- `src/claw_cron/cmd/channels.py` (统一 capture 逻辑)
-
-**测试验证:**
-- 验证 `channels capture --channel-type qqbot` 仍然工作
-- 验证 `channels capture --channel-type feishu` 仍然工作
-
-### Phase 2: Capture 交互改进 (修改现有)
-
-**优先级:** 中 (UX 优化)
-
-**任务:**
-1. **add 命令增加自动询问逻辑**
-   - 验证成功后检查 `channel.supports_capture`
-   - 未指定 `--capture-openid` 时询问用户
-   - 不支持 capture 的通道给出提示
-
-2. **capture 命令增加友好提示**
-   - 对不支持 capture 的通道提示"无需 capture"
-   - 显示该通道应使用的标识符类型
-
-**文件修改:**
-- `src/claw_cron/cmd/channels.py` (add 和 capture 命令)
-
-**测试验证:**
-- 验证 `channels add` 后自动询问 capture
-- 验证 `channels capture --channel-type imessage` 提示无需 capture
-
-### Phase 3: WechatChannel 实现 (新建组件)
-
-**优先级:** 高 (核心功能)
-
-**任务:**
-1. **新建 wechat.py**
-   - 实现 `WechatConfig` 配置类
-   - 实现 `WechatChannel` 类
-   - 实现 token 管理 (类似 QQBot)
-   - 实现 `send_text()` 和 `send_markdown()`
-
-2. **注册通道**
-   - 在 `__init__.py` 中导入并注册
-   - 更新 `get_channel_status()` 增加 wechat 验证逻辑
-
-3. **add 命令增加 wechat 配置流程**
-   - 交互式输入 corp_id, agent_id, secret
-   - 验证凭证 (调用 gettoken API)
-   - 保存配置
-
-4. **verify 命令增加 wechat 验证**
-   - 验证 access_token 获取
-   - 显示企业信息
-
-**文件新建:**
-- `src/claw_cron/channels/wechat.py`
-
-**文件修改:**
-- `src/claw_cron/channels/__init__.py` (注册 wechat)
-- `src/claw_cron/cmd/channels.py` (add 和 verify 命令)
-
-**测试验证:**
-- 验证 `channels add` 能选择 wechat
-- 验证凭证验证正确
-- 验证 `channels verify wechat` 工作
-- 验证 `send_text()` 发送消息成功
-
-### Phase 4: 飞书 Capture 交互增强 (修改现有)
-
-**优先级:** 中 (需求要求)
-
-**任务:**
-1. **飞书 capture 交互式列表选择**
-   - 获取用户最近联系人列表
-   - InquirerPy 列表选择
-   - 保存选中的联系人
-
-**注意:** 飞书 API 是否支持获取联系人列表需要调研。
-
-**文件修改:**
-- `src/claw_cron/channels/feishu.py` (增加获取联系人方法)
-- `src/claw_cron/cmd/channels.py` (capture 命令增加交互)
-
-**测试验证:**
-- 验证飞书 capture 显示联系人列表
-- 验证选择后正确保存
-
-### Phase 5: 版本升级 (修改配置)
-
-**优先级:** 低 (收尾工作)
-
-**任务:**
-1. 更新 `pyproject.toml` 版本号到 0.2.1
-2. 更新 `PROJECT.md` 里程碑状态
-
-**文件修改:**
-- `pyproject.toml`
-- `.planning/PROJECT.md`
-
-## 依赖关系图
+## Build Order (Dependency-Aware)
 
 ```
-Phase 1 (架构增强)
-    ↓
-    ├──→ Phase 2 (Capture 交互改进)
-    │        ↓
-    └──→ Phase 3 (WechatChannel 实现)
-             ↓
-         Phase 4 (飞书 Capture 增强)
-             ↓
-         Phase 5 (版本升级)
+Phase 1: Data Layer (no dependencies)
+  ├── context.py: load_context(), save_context() — pure YAML/JSON I/O
+  ├── when_eval.py: evaluate_when() — pure function, no I/O
+  └── storage.py: Add context_inject field — backward compatible
+
+Phase 2: Injection Layer (depends on Phase 1)
+  ├── context.py: build_env(), render_script(), write_context_file()
+  └── notifier.py: Add when field to NotifyConfig + from_dict()
+
+Phase 3: Integration Layer (depends on Phase 1 + 2)
+  ├── executor.py: Modify execute_task() — inject context, parse stdout, persist
+  ├── executor.py: Modify execute_task_with_notify() — when evaluation
+  └── notifier.py: Enhance render_message() with context vars (optional)
+
+Phase 4: CLI Layer (depends on Phase 3)
+  └── cmd/: Add context_inject and when options to `add`/`update` commands
 ```
 
-**并行可能性:**
-- Phase 2 和 Phase 3 可以并行进行 (都依赖 Phase 1，但相互独立)
-- Phase 4 需要等待 Phase 3 完成 (可能复用交互逻辑)
-- Phase 5 最后执行
+**Rationale:** Phase 1 can be fully tested in isolation. Phase 2 depends on Phase 1 data structures. Phase 3 wires everything together. Phase 4 exposes to users.
 
-## 新建 vs 修改清单
+---
 
-### 新建文件
+## Component Boundaries
 
-| 文件 | 用途 | Phase |
-|------|------|-------|
-| `src/claw_cron/channels/wechat.py` | 企业微信通道实现 | Phase 3 |
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| `context.py` | Load/save context, inject into subprocess, parse stdout | `storage.Task` (reads task.name, context_inject, script), `executor` (called by) |
+| `when_eval.py` | Evaluate when expressions | `notifier.NotifyConfig` (reads when field), `executor` (called by) |
+| `storage.Task` | Task configuration including context_inject | All components (read task config) |
+| `notifier.NotifyConfig` | Notification config including when | `executor` (reads when), `storage` (serialized in tasks.yaml) |
+| `executor.execute_task()` | Orchestrate context→execute→parse→persist | `context`, `when_eval`, `storage`, `notifier` |
 
-### 修改文件
+---
 
-| 文件 | 修改内容 | Phase |
-|------|---------|-------|
-| `src/claw_cron/channels/base.py` | 新增 `supports_capture` 属性和 `capture_openid()` 方法 | Phase 1 |
-| `src/claw_cron/channels/qqbot.py` | 实现 `capture_openid()` | Phase 1 |
-| `src/claw_cron/channels/feishu.py` | 实现 `capture_openid()`，增强联系人获取 | Phase 1, 4 |
-| `src/claw_cron/channels/imessage.py` | 设置 `supports_capture = False` | Phase 1 |
-| `src/claw_cron/channels/email.py` | 设置 `supports_capture = False` | Phase 1 |
-| `src/claw_cron/channels/__init__.py` | 注册 wechat 通道 | Phase 3 |
-| `src/claw_cron/cmd/channels.py` | 统一 capture 逻辑，增加自动询问，增加 wechat 配置 | Phase 1, 2, 3 |
-| `pyproject.toml` | 版本号升级 | Phase 5 |
-| `.planning/PROJECT.md` | 更新里程碑状态 | Phase 5 |
+## Data Storage Design
 
-## 关键决策点
+### Context Files: `~/.config/claw-cron/contexts/`
 
-### D-01: WechatChannel 是否需要 capture?
+```
+contexts/
+├── disk-check.json          # Persisted context from last run
+├── disk-check_input.json    # Temporary input file for current run (overwritten each time)
+├── price-monitor.json
+└── ...
+```
 
-**决策:** NO
+**Why separate files instead of tasks.yaml?**
+1. **Separation of concerns** — task config is static, context is dynamic runtime state
+2. **Size** — context could grow large; keeping it out of tasks.yaml avoids cluttering the user-editable config
+3. **Atomicity** — writing context doesn't require rewriting the entire tasks.yaml
+4. **Cleanup** — easy to `rm contexts/*.json` without affecting task definitions
+5. **Consistency with existing pattern** — logs already use separate `logs/` directory
 
-**原因:**
-- 企业微信使用企业通讯录中的 UserID
-- UserID 是已知标识，不需要通过消息捕获
-- 与 QQ/Feishu 的 bot-specific openid 机制不同
+### Context JSON Format
 
-**影响:**
-- `WechatChannel.supports_capture = False`
-- add 命令配置完成后提示"直接使用 UserID 发送消息"
+```json
+{
+  "status": "warning",
+  "disk_usage": 85,
+  "last_check": "2025-07-11T08:00:00"
+}
+```
 
-### D-02: Capture 逻辑是否移入 Channel 类?
+Simple flat dict. No nesting — keeps `when` evaluation simple (no dot-notation needed).
 
-**决策:** YES (推荐)
+---
 
-**原因:**
-- 封装通道特定逻辑到对应类
-- 统一 capture 命令入口
-- 便于后续扩展新通道
+## Architectural Patterns
 
-**影响:**
-- 需要 Phase 1 架构重构
-- QQBotChannel 和 FeishuChannel 增加 `capture_openid()` 方法
+### Pattern 1: Fail-Open for Notification
 
-### D-03: 企业微信使用哪个 API?
+**What:** When context parsing fails or when expression is invalid, default to sending the notification.
+**When:** Any conditional notification logic.
+**Trade-offs:** May send unwanted notifications on misconfiguration vs. missing important notifications. Fail-open is safer — users can see the error and fix it.
 
-**决策:** 企业微信应用消息 API (非机器人)
+### Pattern 2: Graceful Degradation for stdout Parsing
 
-**原因:**
-- 项目定位为"通知工具"，不需要机器人对话能力
-- 应用消息 API 更简单，支持全员推送
-- 与 QQ Bot/Feishu Bot 定位一致
+**What:** `parse_stdout()` uses three strategies with fallback. Non-JSON output works fine.
+**When:** Scripts that don't participate in context mechanism.
+**Trade-offs:** Slightly more complex parsing logic vs. requiring all scripts to output JSON. Graceful degradation means existing scripts work unchanged.
 
-**API 端点:**
-- 获取 token: `https://qyapi.weixin.qq.com/cgi-bin/gettoken`
-- 发送消息: `https://qyapi.weixin.qq.com/cgi-bin/message/send`
+### Pattern 3: Explicit Opt-In via context_inject Field
+
+**What:** Context injection only happens when `task.context_inject` is set. Default `None` = no injection.
+**When:** All task types. Agent and reminder types ignore context entirely.
+**Trade-offs:** Requires explicit configuration vs. auto-injecting for all command tasks. Opt-in is safer — no surprise env vars in scripts that don't expect them.
+
+### Pattern 4: Context as Flat Dict
+
+**What:** Context is always a flat `dict[str, Any]`. No nested objects.
+**When:** All context storage and evaluation.
+**Trade-offs:** Limits expressiveness (no nested data) vs. keeps when-eval and env-var injection trivially simple. Aligns with PROJECT.md constraint of simple `==`/`!=` expressions.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Storing Context in tasks.yaml
+
+**What people might do:** Add a `context` field to the Task dataclass and persist it alongside task config.
+**Why it's wrong:** tasks.yaml is user-editable config. Runtime state mixed with config creates confusing diffs and merge conflicts. Context changes every execution; task config changes rarely.
+**Do this instead:** Separate `contexts/{name}.json` files.
+
+### Anti-Pattern 2: Complex Expression Parser
+
+**What people might do:** Support `and`, `or`, `>`, `<`, function calls in when expressions.
+**Why it's wrong:** Scope creep. PROJECT.md explicitly scopes to `==`/`!=`. Complex expressions need a real parser, error handling, testing matrix. Not justified for v3.0.
+**Do this instead:** Simple regex-based parser in `when_eval.py`. Evolve later if needed.
+
+### Anti-Pattern 3: Modifying subprocess.run Return Handling
+
+**What people might do:** Change `subprocess.run()` to use `stdout=subprocess.PIPE` separately and change how output is concatenated.
+**Why it's wrong:** Existing logging, error handling, and notification all depend on the current `(exit_code, output)` contract. Changing subprocess output handling risks breaking agent/reminder types.
+**Do this instead:** Add parsing on top of existing `result.stdout` — don't change how subprocess is called, only how its output is interpreted.
+
+### Anti-Pattern 4: Context Injection Without env Inheritance
+
+**What people might do:** Build env dict from scratch with only CLAW_CONTEXT_* vars.
+**Why it's wrong:** Scripts often depend on PATH, HOME, etc. Stripping the environment breaks most real-world scripts.
+**Do this instead:** `env = os.environ.copy()` then add CLAW_CONTEXT_* overrides.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| 1-50 tasks | Current design is fine. Context files are small. YAML storage works. |
+| 50-500 tasks | Context directory could get cluttered. Consider cleanup of stale context files. YAML still fine for config. |
+| 500+ tasks | May need SQLite for context storage. YAML starts to slow on load_tasks(). But this is a single-user local CLI — unlikely to hit this. |
+
+### Scaling Priorities
+
+1. **First bottleneck:** Context file I/O on every execution — for most tasks (1-50), this is negligible. No optimization needed.
+2. **Second bottleneck:** YAML full-rewrite on every context update — mitigated by using separate context files, not tasks.yaml.
+
+---
+
+## Integration Points
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| executor ↔ context | Direct function calls | executor calls context.load/save/build_env/parse. No events, no queue. |
+| executor ↔ when_eval | Direct function call | executor calls evaluate_when() with notify.when and context dict |
+| storage ↔ context | context reads task.name, task.context_inject | No back-reference. Context doesn't import storage. |
+| notifier ↔ when_eval | None | when evaluation happens in executor, before notifier is called |
+| scheduler ↔ context | None | Scheduler doesn't need to know about context. Transparent. |
+
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| User scripts | Env vars + context file + template vars | Scripts opt in by reading CLAW_CONTEXT_* or CLAW_CONTEXT_FILE or using {{ var }} |
+| subprocess.run | `env` parameter | Standard Python subprocess interface |
+
+---
 
 ## Sources
 
-- 企业微信 API 文档: https://developer.work.weixin.qq.com/document/path/90236
-- QQ Bot API 文档: https://bot.q.qq.com/wiki/develop/api/
-- 飞书开放平台: https://open.feishu.cn/document/client-docs/bot-v3/events
+- Direct codebase analysis of `storage.py`, `executor.py`, `scheduler.py`, `notifier.py`, `config.py`, `channels/__init__.py`
+- PROJECT.md v3.0 milestone requirements
+- Python subprocess.run documentation for `env` parameter behavior
 
 ---
-*Architecture research for: 微信通道 & Capture 增强*
-*Researched: 2026-04-17*
+*Architecture research for: claw-cron v3.0 context mechanism*
+*Researched: 2025-07-11*

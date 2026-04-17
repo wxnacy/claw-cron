@@ -55,7 +55,7 @@
 
 **Milestone Goal:** 增加 update 命令，支持修改已有任务的字段，版本升级到 0.3.1
 
-- [ ] **Phase 21: Update Command & Release** - 实现 update 子命令，支持修改任务字段，版本升级到 0.3.1
+- [x] **Phase 21: Update Command & Release** - 实现 update 子命令，支持修改任务字段，版本升级到 0.3.1 (completed 2026-04-17)
 
 ## Phase Details
 
@@ -74,7 +74,7 @@
 4. User can update notification message, script content, or prompt content via `--message`, `--script`, `--prompt` options respectively
 5. Version number is updated to 0.3.1 in pyproject.toml
 
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 
 ---
 
@@ -85,7 +85,7 @@ Phase 21
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 21. Update Command & Release | v3.1 | 0/? | Not started | - |
+| 21. Update Command & Release | v3.1 | 1/1 | Complete    | 2026-04-17 |
 
 ## Coverage
 

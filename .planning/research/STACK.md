@@ -1,12 +1,14 @@
 # Stack Research
 
-**Domain:** WeChat Channel & Capture Enhancement
+**Domain:** Command Task Context Mechanism (v3.0)
 **Researched:** 2026-04-17
 **Confidence:** HIGH
 
 ## Executive Summary
 
-WeChat integration research reveals three distinct approaches with clear trade-offs. **企业微信机器人 Webhook** is the recommended solution for claw-cron due to its simplicity, no authentication requirements, and alignment with the project's notification-only use case. 企业微信应用 provides richer features but requires complex OAuth2 and user ID management. 个人微信 solutions (itchat/WeChatBot) carry high封号 risk and are NOT recommended.
+The v3.0 command task context mechanism requires **zero new external dependencies**. All capabilities can be built with Python stdlib and the existing stack (PyYAML, Click, Rich). The four new features — environment variable injection, template variable expansion, context file passing, and JSON stdout parsing — map directly to stdlib primitives: `subprocess.run(env=...)`, `str.replace()` (matching existing `{{ var }}` pattern), `tempfile`/`pathlib`, and `json.loads()`. The conditional notification `when` field needs only `==`/`!=` comparison, which is a ~30-line custom parser — not worth adding simpleeval for.
+
+Key design decisions influenced by reference implementations: GitHub Actions' file-based `$GITHUB_OUTPUT` pattern inspires the context file approach (write JSON to a known path via env var), and Airflow XCom's explicit push/pull model informs the stdout JSON protocol (script explicitly outputs structured data, system parses it). Unlike these systems, claw-cron is single-user and single-machine, so we avoid their complexity (no distributed coordination, no serialization backends).
 
 ## Recommended Stack
 
@@ -14,370 +16,455 @@ WeChat integration research reveals three distinct approaches with clear trade-o
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| **企业微信机器人 Webhook** | N/A (HTTP API) | Send notifications to WeChat Work groups | Simplest integration: no auth tokens, no user ID management, just POST to webhook URL. Supports text/markdown/images. Rate limit: 20 msgs/min per webhook. |
-| **httpx** | ^0.28.0 | Async HTTP client for webhook calls | Already used in QQBotChannel, proven pattern in codebase. Supports async, retries, timeout. Consistent with existing channel implementations. |
-| **tenacity** | ^9.0.0 | Retry logic for API calls | Already used in qqbot.py and feishu.py for rate limit handling. Proven pattern for resilience. |
+| **Python stdlib: json** | 3.12+ | Parse JSON from script stdout | Built-in, zero dependencies. `json.loads()` handles the full JSON spec. Scripts write JSON to stdout, system parses it. Matches GitHub Actions `$GITHUB_OUTPUT` file-write pattern but simpler (stdout vs file). |
+| **Python stdlib: subprocess** | 3.12+ | Execute scripts with injected env vars | `subprocess.run(env={...})` parameter merges custom env with `os.environ`. Already used in `executor.py` — just needs `env` parameter added. |
+| **Python stdlib: pathlib** | 3.12+ | Manage context file paths | `~/.config/claw-cron/context/{task_name}.json` for per-task context files. Already used throughout codebase. |
+| **Python stdlib: tempfile** | 3.12+ | Create temporary context input files | `NamedTemporaryFile(suffix=".json", delete=False)` for context files passed to scripts via `CLAW_CRON_CONTEXT_FILE` env var. Auto-cleaned after execution. Alternative: write to persistent context dir directly. |
+| **Python stdlib: os** | 3.12+ | Build environment variable dict | `os.environ | custom_env` merges existing env with injected context vars. Python 3.9+ dict merge operator. |
+| **PyYAML** | existing | Persist task config with new fields | Extend `Task` dataclass with `context` field. Context state stored in separate JSON files, not in tasks.yaml (separation of config vs state). |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| **pydantic** | ^2.0.0 | Config validation (WebhookConfig) | All channels use pydantic-settings for config. Pattern: `class WechatWorkConfig(BaseSettings, ChannelConfig)` |
-| **pydantic-settings** | ^2.0.0 | Environment variable config loading | Environment variable prefix pattern: `CLAW_CRON_WECHAT_WORK_` |
+| **json (stdlib)** | 3.12+ | Persist task context between executions | Write to `~/.config/claw-cron/context/{task_name}.json` after each run. Read before next run for template/env injection. |
+| **re (stdlib)** | 3.12+ | Parse `when` conditional expressions | Simple regex to split `field == "value"` or `field != "value"` into (field, operator, value) tuple. No external lib needed for `==`/`!=` only. |
+| **datetime (stdlib)** | 3.12+ | Inject date/time template variables | Already used in `render_message()`. Extend to `{{ date }}`, `{{ time }}`, `{{ datetime }}` for script templates. |
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| **企业微信管理后台** | Create webhook, get webhook URL | Group settings → Group robots → Add robot. Webhook URL format: `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=XXX` |
-| **curl / httpie** | Test webhook manually | `curl -X POST $WEBHOOK_URL -H 'Content-Type: application/json' -d '{"msgtype":"text","text":{"content":"test"}}'` |
+| **jq** | Test script JSON output manually | `your-script.sh | jq .` to verify JSON output format |
+| **env** | Verify environment variable injection | `env | grep CLAW_CRON_` inside test scripts |
+| **cat** | Inspect context files | `cat ~/.config/claw-cron/context/task_name.json` |
 
 ## Installation
 
 ```bash
-# Core dependencies (already in project)
-# httpx, tenacity, pydantic, pydantic-settings already installed
+# No new packages needed!
+# All v3.0 features use Python stdlib or existing dependencies.
 
-# No additional packages needed for WeChat Work Webhook
+# Existing dependencies used:
+# - PyYAML (task config storage)
+# - Click (CLI argument additions)
+# - Rich (output formatting)
+
+# Dev dependencies for testing:
+uv add --dev pytest pytest-asyncio  # Already in dev group
 ```
 
-## WeChat Channel Comparison
+## New Feature Stack Details
 
-### Option 1: 企业微信机器人 Webhook ✅ RECOMMENDED
+### Feature 1: Environment Variable Context Injection
 
-**API Endpoint:**
-```
-POST https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=WEBHOOK_KEY
-```
+**Mechanism:** Construct env dict with `CLAW_CRON_` prefixed variables, pass to `subprocess.run(env=...)`.
 
-**Features:**
-- ✅ **No authentication required** - Webhook URL contains key
-- ✅ **Simple HTTP POST** - No OAuth2, no token management
-- ✅ **Rich message types** - text, markdown, markdown_v2, image, news, file, voice, template_card
-- ✅ **Rate limit: 20 msgs/min** - Sufficient for notification use case
-- ✅ **No user ID management** - Send to group, all members receive
-- ✅ **Markdown support** - Bold, links, code, quotes, colors (info/comment/warning)
+**Variables to inject:**
 
-**Limitations:**
-- ❌ Group-only (no private chat)
-- ❌ Need to create webhook in group settings
-- ❌ Webhook URL must be kept secret
+| Env Var | Value | Example |
+|---------|-------|---------|
+| `CLAW_CRON_TASK_NAME` | Task name | `"backup-check"` |
+| `CLAW_CRON_TASK_TYPE` | Task type | `"command"` |
+| `CLAW_CRON_CRON` | Cron expression | `"0 8 * * *"` |
+| `CLAW_CRON_DATE` | Current date | `"2026-04-17"` |
+| `CLAW_CRON_TIME` | Current time | `"08:00:00"` |
+| `CLAW_CRON_DATETIME` | Current datetime | `"2026-04-17T08:00:00"` |
+| `CLAW_CRON_CONTEXT_FILE` | Path to context JSON file | `"/tmp/claw-cron-ctx-XXXX.json"` |
 
-**Message Types:**
+**Implementation pattern:**
 
-| Type | msgtype | Max Size | Features |
-|------|---------|----------|----------|
-| Text | `text` | 2048 bytes | @members by userid or phone |
-| Markdown | `markdown` | 4096 bytes | Headers, bold, links, code, quotes, colors |
-| Image | `image` | 2MB (base64) | JPG/PNG, send via base64 + md5 |
-| News | `news` | 1-8 articles | Title, desc, url, picurl |
-
-**Integration Points:**
-
-1. **Channel Implementation:**
 ```python
-# src/claw_cron/channels/wechat_work.py
-class WechatWorkChannel(MessageChannel):
-    """WeChat Work group robot webhook channel."""
+import os
+import subprocess
 
-    @property
-    def channel_id(self) -> str:
-        return "wechat_work"
+def _build_env(task: Task) -> dict[str, str]:
+    """Build environment dict with injected context variables."""
+    now = datetime.now()
+    custom = {
+        "CLAW_CRON_TASK_NAME": task.name,
+        "CLAW_CRON_TASK_TYPE": task.type,
+        "CLAW_CRON_CRON": task.cron,
+        "CLAW_CRON_DATE": now.strftime("%Y-%m-%d"),
+        "CLAW_CRON_TIME": now.strftime("%H:%M:%S"),
+        "CLAW_CRON_DATETIME": now.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    # Add context file path if previous context exists
+    context_file = _context_file_path(task.name)
+    if context_file.exists():
+        custom["CLAW_CRON_CONTEXT_FILE"] = str(context_file)
+    return os.environ | custom
 
-    async def send_text(self, recipient: str, content: str) -> MessageResult:
-        # recipient is webhook_key (extract from webhook URL)
-        # POST to https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={recipient}
-        ...
+# In execute_task:
+result = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=_build_env(task))
 ```
 
-2. **Configuration:**
+**Reference:** GitHub Actions injects `GITHUB_*` env vars into every step. Same pattern, `CLAW_CRON_*` prefix.
+
+---
+
+### Feature 2: Template Variable Context Injection
+
+**Mechanism:** Extend existing `render_message()` pattern to script field. Replace `{{ var }}` placeholders before execution.
+
+**Variables available:**
+
+| Template Var | Resolves To | Example |
+|-------------|-------------|---------|
+| `{{ date }}` | Current date | `"2026-04-17"` |
+| `{{ time }}` | Current time | `"08:00:00"` |
+| `{{ datetime }}` | Current datetime | `"2026-04-17T08:00:00"` |
+| `{{ context.key }}` | Previous context value | `"3"` (from last run's JSON output) |
+
+**Implementation pattern:**
+
+```python
+def _render_script(task: Task, context: dict[str, Any] | None = None) -> str:
+    """Render script template with variables."""
+    script = task.script or ""
+    now = datetime.now()
+    script = script.replace("{{ date }}", now.strftime("%Y-%m-%d"))
+    script = script.replace("{{ time }}", now.strftime("%H:%M:%S"))
+    script = script.replace("{{ datetime }}", now.strftime("%Y-%m-%dT%H:%M:%S"))
+    # Inject previous context values
+    if context:
+        for key, value in context.items():
+            script = script.replace(f"{{{{ context.{key} }}}}", str(value))
+    return script
+```
+
+**Why `str.replace()` over `string.Template`:** Consistency. The existing reminder system uses `{{ var }}` with `str.replace()` (see `notifier.py:render_message`). Using `string.Template` would introduce `$var` syntax inconsistency. Keep `{{ var }}` everywhere.
+
+---
+
+### Feature 3: Context File Injection (System → Script)
+
+**Mechanism:** Write previous execution's context JSON to a temp file, set `CLAW_CRON_CONTEXT_FILE` env var pointing to it.
+
+**Two approaches:**
+
+| Approach | Path | Lifecycle | Trade-off |
+|----------|------|-----------|-----------|
+| **A: Persistent context dir** | `~/.config/claw-cron/context/{task_name}.json` | Persists between runs, manual cleanup | Script can re-read outside execution; survives restarts |
+| **B: Temp file per execution** | `/tmp/claw-cron-ctx-{task_name}-{random}.json` | Created before run, deleted after | Cleaner lifecycle; script can't read stale data between runs |
+
+**Recommendation: Approach A (persistent context dir).**
+
+Why:
+1. Script might fail mid-way — temp file cleanup would lose the previous context, making debugging harder
+2. Persistent file allows manual inspection (`cat ~/.config/claw-cron/context/backup.json`)
+3. Context file IS the state store — it should persist between runs (that's the whole point)
+4. If `CLAW_CRON_CONTEXT_FILE` points to the persistent path, scripts can also write to it (though stdout JSON is preferred)
+
+**Implementation pattern:**
+
+```python
+CONTEXT_DIR = Path.home() / ".config" / "claw-cron" / "context"
+
+def _context_file_path(task_name: str) -> Path:
+    """Return the context file path for a task."""
+    return CONTEXT_DIR / f"{task_name}.json"
+
+def _load_context(task_name: str) -> dict[str, Any] | None:
+    """Load previous context for a task."""
+    path = _context_file_path(task_name)
+    if path.exists():
+        return json.loads(path.read_text())
+    return None
+
+def _save_context(task_name: str, context: dict[str, Any]) -> None:
+    """Save context for a task after execution."""
+    path = _context_file_path(task_name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(context, ensure_ascii=False, indent=2))
+```
+
+**Reference:** GitHub Actions' `$GITHUB_OUTPUT` writes `key=value` pairs to a file whose path is set via env var. Same pattern: `CLAW_CRON_CONTEXT_FILE` points to `~/.config/claw-cron/context/{task_name}.json`.
+
+---
+
+### Feature 4: JSON stdout Context Feedback (Script → System)
+
+**Mechanism:** After script execution, parse stdout as JSON. If valid JSON, store as task context for next run.
+
+**Protocol:**
+
+```
+Script writes JSON to stdout → System captures via subprocess.run(capture_output=True)
+→ json.loads(stdout) → If valid, save to context file → Available next run via env var + template var
+```
+
+**Parsing strategy (ordered):**
+
+1. **Try full stdout as JSON** — `json.loads(stdout.strip())`. Works for scripts that output ONLY JSON.
+2. **Try last line as JSON** — Scripts may output diagnostic text before JSON. Parse only the last non-empty line. This handles `echo "Starting..." && echo '{"status": "ok"}'`.
+3. **No valid JSON** — Treat entire stdout as plain text output (existing behavior). No context update.
+
+**Why last-line parsing:** Real-world scripts often mix logging and structured output. GitHub Actions uses `echo "key=value" >> $GITHUB_OUTPUT` (append to file) — but JSON stdout is cleaner for structured data. The "last line is JSON" convention is simple and well-understood.
+
+**Implementation pattern:**
+
+```python
+def _parse_context_from_stdout(stdout: str) -> dict[str, Any] | None:
+    """Try to extract JSON context from script stdout.
+
+    Strategy:
+    1. Try parsing entire stdout as JSON
+    2. Try parsing last non-empty line as JSON
+    3. Return None if no valid JSON found
+    """
+    stdout = stdout.strip()
+    if not stdout:
+        return None
+
+    # Try full stdout
+    try:
+        result = json.loads(stdout)
+        if isinstance(result, dict):
+            return result
+    except json.JSONDecodeError:
+        pass
+
+    # Try last line
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if lines:
+        try:
+            result = json.loads(lines[-1])
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    return None
+```
+
+**Validation rules:**
+- Only `dict` (JSON object) is accepted as context — arrays, scalars are ignored
+- Keys must be strings (JSON requirement)
+- Values should be JSON-serializable (strings, numbers, bools, null, nested dicts/lists)
+- Context dict size limit: keep under 64KB (don't store large data — this is metadata, not a database)
+
+**Reference:** Airflow XCom requires serializable values and warns against large data. Same principle — context is for small metadata (status, counters, flags), not data payloads.
+
+---
+
+### Feature 5: Conditional Notification (when field)
+
+**Mechanism:** Add `when` field to `NotifyConfig`. Before sending notification, evaluate the expression against current context.
+
+**Expression format:**
+
+```
+field == "value"      # Equality (string comparison)
+field != "value"      # Inequality (string comparison)
+field == 42           # Equality (numeric comparison)
+field != 0            # Inequality (numeric comparison)
+```
+
+**Scope:** Only `==` and `!=` operators. No `and`/`or`, no functions, no arithmetic. Per PROJECT.md constraints.
+
+**Implementation: Custom parser (no external library)**
+
+Why NOT simpleeval:
+1. Only 2 operators needed — simpleeval supports 15+ operators, 90% unused
+2. Adds a dependency for trivial functionality
+3. Custom parser is ~30 lines of code, fully understood, no attack surface concerns
+4. If scope expands later, we can add simpleeval then (it's a drop-in replacement)
+
+```python
+import re
+
+_WHEN_PATTERN = re.compile(
+    r'^(\w+)\s*(==|!=)\s*(.+)$'
+)
+
+def evaluate_when(when: str, context: dict[str, Any]) -> bool:
+    """Evaluate a when condition against context.
+
+    Args:
+        when: Expression like 'status == "ok"' or 'count != 0'
+        context: Current task context dict
+
+    Returns:
+        True if condition matches, False otherwise.
+        Returns True (always notify) if expression is invalid.
+    """
+    match = _WHEN_PATTERN.match(when.strip())
+    if not match:
+        logger.warning(f"Invalid when expression: {when!r}")
+        return True  # Default: send notification on invalid expression
+
+    field, operator, value_str = match.groups()
+    value_str = value_str.strip()
+
+    # Remove surrounding quotes if present
+    if (value_str.startswith('"') and value_str.endswith('"')) or \
+       (value_str.startswith("'") and value_str.endswith("'")):
+        value_str = value_str[1:-1]
+
+    # Get field value from context
+    if field not in context:
+        return operator == "!="  # Missing field: != is True, == is False
+
+    context_value = context[field]
+
+    # Compare values
+    if operator == "==":
+        return str(context_value) == value_str
+    elif operator == "!=":
+        return str(context_value) != value_str
+
+    return True  # Unknown operator: default to notify
+```
+
+**Design decisions:**
+- String comparison via `str()` conversion — simple, predictable
+- Missing field: `!=` evaluates True (notify), `==` evaluates False (skip) — conservative default
+- Invalid expression: default to notify (fail-open for notifications, since missing a notification is worse than an extra one)
+- No type coercion beyond string — keep it simple. `status == "ok"` compares string-to-string.
+
+---
+
+### Feature 6: YAML Schema Changes
+
+**Task dataclass additions:**
+
+```python
+@dataclass
+class Task:
+    name: str
+    cron: str
+    type: str
+    script: str | None = None
+    prompt: str | None = None
+    client: str | None = None
+    client_cmd: str | None = None
+    enabled: bool = field(default=True)
+    notify: NotifyConfig | None = None
+    message: str | None = None
+    # NEW v3.0 fields:
+    context: dict[str, Any] | None = None  # In-memory only, NOT saved to tasks.yaml
+```
+
+**NotifyConfig additions:**
+
+```python
+@dataclass
+class NotifyConfig:
+    channel: str
+    recipients: list[str] = field(default_factory=list)
+    # NEW v3.0 field:
+    when: str | None = None  # Conditional expression, e.g. 'status != "ok"'
+```
+
+**Important: `context` is NOT persisted in tasks.yaml.** Context state lives in `~/.config/claw-cron/context/{task_name}.json` as a separate JSON file. Reasons:
+1. tasks.yaml is config (rarely changes, user-edited) — context is state (changes every run, machine-generated)
+2. Writing context to tasks.yaml on every execution would bloat it and create merge conflicts for version-controlled configs
+3. JSON is a better format for programmatic read/write of structured state
+4. Follows the separation principle: config (YAML) vs state (JSON)
+
+**Example tasks.yaml with new fields:**
+
 ```yaml
-# ~/.config/claw-cron/config.yaml
-channels:
-  wechat_work:
-    enabled: true
-    # Store webhook_key or full URL
-    webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=XXXXXX"
+tasks:
+  - name: disk-check
+    cron: "0 8 * * *"
+    type: command
+    script: "df -h / | tail -1 | awk '{print \"{\\\"usage\\\": \\\"\" $5 \"\\\"}\" }'"
+    notify:
+      channel: qqbot
+      recipients:
+        - "c2c:ABC123"
+      when: 'usage != "0%"'  # Only notify if disk has usage
 ```
 
-3. **Recipient Format:**
-```
-# Option 1: Full webhook URL
-recipients: ["https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=XXX"]
+## Alternatives Considered
 
-# Option 2: Just the key
-recipients: ["webhook:XXX"]
-```
-
----
-
-### Option 2: 企业微信应用 ⚠️ NOT RECOMMENDED
-
-**API Endpoint:**
-```
-POST https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=ACCESS_TOKEN
-```
-
-**Features:**
-- ✅ Private chat to individual users (touser)
-- ✅ Send to departments (toparty) and tags (totag)
-- ✅ Send to "@all" (all visible users)
-- ✅ Rich message types (11 types including template cards)
-- ✅ ID translation ($userName=USERID$ → "张三")
-
-**Why NOT Recommended:**
-
-| Issue | Impact |
-|-------|--------|
-| **OAuth2 required** | Need access_token management (refresh every 2 hours) |
-| **User ID required** | Must know userid to send private messages |
-| **UserID获取复杂** | 需要：手机号查询API / 邮箱查询API / 网页授权 / 通讯录同步 |
-| **可见范围限制** | 用户必须在应用的可见范围内才能收到消息 |
-| **频率限制严格** | 单成员: 30次/分钟, 1000次/小时; 企业: 2万人次/分钟 |
-| **需要创建应用** | 企业微信管理后台 → 应用管理 → 创建自建应用 |
-| **需要三个凭证** | corp_id, agent_id, secret (vs webhook只需URL) |
-
-**Complex Integration Points:**
-
-1. **Token Management:**
-```python
-# Need to implement token cache with refresh
-async def get_access_token(self) -> str:
-    if self._token and not self._token.is_expired():
-        return self._token.access_token
-
-    # POST to https://qyapi.weixin.qq.com/cgi-bin/gettoken
-    response = await self._http_client.post(
-        "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
-        params={"corpid": self.config.corp_id, "corpsecret": self.config.secret}
-    )
-    # Cache token, expires in 7200s
-```
-
-2. **User ID Acquisition:**
-```python
-# Option 1: By phone number
-POST https://qyapi.weixin.qq.com/cgi-bin/user/getuserid?access_token=ACCESS_TOKEN
-{"mobile": "13800138000"}
-
-# Option 2: By email
-POST https://qyapi.weixin.qq.com/cgi-bin/user/get_userid_by_email?access_token=ACCESS_TOKEN
-{"email": "user@example.com"}
-
-# Option 3: Web OAuth (complex)
-# Redirect user to OAuth URL, get code, exchange for userinfo
-```
-
-3. **Configuration Complexity:**
-```yaml
-channels:
-  wechat_work_app:
-    enabled: true
-    corp_id: "wwXXXXXX"           # 企业ID
-    agent_id: 1000001             # 应用AgentId
-    secret: "XXXXXX"              # 应用Secret
-    # Optional: how to map phone/email to userid for capture?
-```
-
-**When This Might Be Worth It:**
-- Need private notifications to specific users (not groups)
-- Already have user ID mapping from external system
-- Sending >1000 notifications per hour (need higher limits)
-
----
-
-### Option 3: 个人微信 (itchat/WeChatBot) ❌ NOT RECOMMENDED
-
-**Libraries:**
-- **itchat**: Last maintained ~2019, frequent封号 reports
-- **itchat-uos**: Fork for UOS system, still has封号 risk
-- **WeChatBot**: PC client hook, requires running WeChat desktop
-
-**Why NOT Recommended:**
-
-| Issue | Severity |
-|-------|----------|
-| **封号风险极高** | 腾讯严厉打击非官方客户端，频繁封号 |
-| **稳定性差** | 需要保持微信登录状态，掉线需重新扫码 |
-| **需要扫码登录** | 不适合服务器环境，需要图形界面或长期session |
-| **违反用户协议** | 非官方API，违反微信服务条款 |
-| **无官方支持** | 问题无法通过官方渠道解决 |
-
-**Risk Assessment:**
-- 2026年3月文章指出："任何自动化操作都有风险"
-- 封号主要原因：频繁操作、异常行为、非官方客户端
-- 即使使用稳定方案（PC客户端HOOK），风险仍存在
-
-**Alternatives Mentioned (but still risky):**
-- ChatWave: 99.8%账号安全率（商业方案）
-- ClawBot: 开源桥接工具，仍有风险
-- 微信 iLink: 官方Bot API（2026年3月发布，申请条件未知）
-
----
-
-## Integration Points with Existing Architecture
-
-### 1. Follow QQBotChannel Pattern
-
-**Similarities:**
-- Both use httpx for async HTTP calls
-- Both use tenacity for retry logic
-- Both parse recipient to determine send target
-- Both support text and markdown
-
-**Key Differences:**
-
-| Aspect | QQ Bot | WeChat Work Webhook |
-|--------|--------|---------------------|
-| Auth | OAuth2 (app_id + client_secret) | None (webhook key in URL) |
-| Recipient | `c2c:OPENID` or `group:GROUP_OPENID` | Webhook key or full URL |
-| Token management | Required (cache + refresh) | Not needed |
-| Rate limit | Complex (multiple codes) | Simple: 20/min per webhook |
-
-### 2. File Structure
-
-```
-src/claw_cron/channels/
-├── wechat_work.py          # New: WechatWorkChannel
-├── __init__.py             # Register: CHANNEL_REGISTRY["wechat_work"] = WechatWorkChannel
-├── base.py                 # No changes
-└── qqbot.py                # Reference pattern
-```
-
-### 3. Configuration Pattern
-
-```python
-# src/claw_cron/channels/wechat_work.py
-from pydantic import Field
-from pydantic_settings import BaseSettings
-
-class WechatWorkConfig(BaseSettings, ChannelConfig):
-    """Configuration for WeChat Work webhook channel."""
-
-    webhook_url: str | None = Field(
-        default=None,
-        description="WeChat Work webhook URL or key"
-    )
-
-    class Config:
-        env_prefix = "CLAW_CRON_WECHAT_WORK_"
-        env_file = ".env"
-        extra = "ignore"
-```
-
-### 4. Channel Status Check
-
-Update `get_channel_status()` in `__init__.py`:
-
-```python
-elif channel_id == "wechat_work":
-    if "webhook_url" not in channel_cfg:
-        return "⚠", "配置不完整"
-```
-
-### 5. Capture Flow Integration
-
-**For WeChat Work Webhook:**
-- **No capture needed** - Webhook URL is static, configured in config.yaml
-- Unlike QQ/Feishu which need openid (capture from WebSocket events)
-
-**Simplified flow:**
-```
-channels add wechat_work
-  → Prompt for webhook_url
-  → Validate by sending test message
-  → Save to config.yaml
-  → Done (no capture needed)
-```
-
----
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| **Custom `when` parser** | simpleeval (v1.0.7) | Only need `==`/`!=` — adding a 60KB dependency for 2 operators is overkill. simpleeval supports 15+ operators, compound types, custom functions — 90% unused. Custom parser is ~30 LOC, zero dependencies, zero attack surface. Add simpleeval later IF scope expands beyond `==`/`!=`. |
+| **Persistent context dir** (JSON files) | Context in tasks.yaml | tasks.yaml is user config, not runtime state. Mixing config + state in one file creates bloat, merge conflicts, and confusion. Separate JSON files follow the config/state separation principle. |
+| **`str.replace()` for templates** | `string.Template` ($var syntax) | Existing codebase uses `{{ var }}` with `str.replace()` in `render_message()`. Introducing `$var` syntax would be inconsistent. Keep `{{ var }}` everywhere. |
+| **Last-line JSON parsing** | Structured output format (e.g., `::context::` prefix) | Simple convention (last line = JSON) is sufficient for the use case. Adding a prefix marker (like GitHub Actions `::set-output`) adds complexity for minimal gain. Scripts can still output debug text before the JSON line. |
+| **`os.environ \| custom`** | Full env replacement | Must preserve existing env vars (PATH, HOME, etc.). Merge operator preserves all existing vars while adding/overriding CLAW_CRON_ prefixed ones. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **itchat** | 封号风险高，维护停滞（2019年后），违反微信协议 | 企业微信机器人 Webhook |
-| **WeChatBot / ClawBot** | PC hook方案风险高，需要图形环境，封号案例多 | 企业微信机器人 Webhook |
-| **企业微信应用** | 集成复杂（OAuth2 + userID获取），不适合通知场景 | 企业微信机器人 Webhook（除非需要私聊） |
-| **wework PyPI包 (0.1.4)** | 最后更新2019年，版本过旧，不支持新API | 直接使用httpx调用API，或使用官方weworkapi_python |
+| **simpleeval** | Overkill for `==`/`!=` only. Adds dependency, attack surface, and learning curve for 2 operators. | Custom ~30-line regex-based parser |
+| **asteval** | Even more overkill than simpleeval — full Python subset interpreter | Custom parser |
+| **eval()** | Security risk — arbitrary code execution | Custom parser with regex validation |
+| **Jinja2** | Template engine overkill — we just do `str.replace()` for `{{ var }}` | `str.replace()` (matches existing pattern) |
+| **SQLite** | Unnecessary for small key-value context data. Adds complexity, migration, and dependency. | JSON files in context dir |
+| **pickle** | Security risk — arbitrary code execution on load | JSON (safe, human-readable, debuggable) |
+| **Context in tasks.yaml** | Config vs state mixing, bloat, merge conflicts | Separate JSON files in `~/.config/claw-cron/context/` |
+| **Cross-task context sharing** | Out of scope for v3.0 (per PROJECT.md). Adds complexity (namespacing, cleanup, dependency tracking). | Per-task context files. Future: may add `context_from: other_task` reference. |
 
----
+## Stack Patterns by Variant
 
-## Decision Matrix
+**If `when` expression scope expands beyond `==`/`!=` (future milestone):**
+- Replace custom parser with simpleeval
+- Add `simpleeval>=1.0.7` to dependencies
+- Keep the same `evaluate_when()` interface — only internals change
+- simpleeval supports `>`, `<`, `>=`, `<=`, `in`, `not in`, `and`, `or`, if-expressions
+- Migration is seamless since the `when` string format remains the same
 
-| Criterion | WeChat Work Webhook | WeChat Work App | Personal WeChat |
-|-----------|---------------------|-----------------|-----------------|
-| **Integration complexity** | ✅ LOW | ❌ HIGH | ❌ VERY HIGH |
-| **Authentication** | ✅ None | ❌ OAuth2 + token mgmt | ❌ Login session |
-| **User ID management** | ✅ Not needed | ❌ Required | ❌ Implicit |
-| **Private chat support** | ❌ No | ✅ Yes | ✅ Yes |
-| **Rate limits** | ✅ 20/min | ⚠️ Complex | ❌ Variable |
-| **Account safety** | ✅ Official API | ✅ Official API | ❌ High封号 risk |
-| **Server deployment** | ✅ Easy | ✅ Easy | ❌ Need session |
-| **Fit for notifications** | ✅ Perfect | ⚠️ Overkill | ❌ Risky |
+**If context data grows large (>64KB per task):**
+- Consider adding size warning in `_save_context()`
+- Log warning and truncate if context exceeds limit
+- Don't migrate to database — context is metadata, not a data store
 
----
+**If cross-task context sharing is needed (future):**
+- Add `context_from: task_name` field to Task
+- Read that task's context file instead of own
+- Keep same JSON format, just different file path
+- No new dependencies needed
 
-## Recommendation
+## Version Compatibility
 
-**Use 企业微信机器人 Webhook** for claw-cron WeChat channel implementation.
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| Python 3.12 json | All supported Python versions | `json.loads()` and `json.dumps()` are stable since Python 3.0 |
+| Python 3.12 subprocess | All supported Python versions | `env` parameter available since Python 3.0 |
+| Python 3.12 re | All supported Python versions | `re.compile()` is stable |
+| Python 3.12 os.environ | All supported Python versions | Dict merge `|` operator requires Python 3.9+ (already required) |
+| PyYAML | Existing version | No new features needed — just extending dataclass fields |
+| Click | Existing version | No new features needed — just adding `--when` option |
 
-**Rationale:**
-1. **Simplicity** - No auth, no user ID, just POST to webhook URL
-2. **Alignment** - claw-cron only sends notifications (no need for private chat)
-3. **Safety** - Official API, no封号 risk
-4. **Pattern consistency** - Similar to QQBotChannel implementation
-5. **No capture needed** - Webhook URL is static config (vs QQ/Feishu need openid capture)
+## Reference Implementation Comparison
 
-**Defer 企业微信应用** unless:
-- Private notifications to specific users become a requirement
-- User ID mapping infrastructure already exists
-
-**Never use 个人微信 solutions**:
-- 封号风险 unacceptable for production use
-- Violates WeChat terms of service
-- Stability issues in server environments
-
----
+| Aspect | GitHub Actions | Airflow XCom | Jenkins | This Project (claw-cron) |
+|--------|---------------|--------------|---------|--------------------------|
+| **Output mechanism** | `$GITHUB_OUTPUT` file (key=value) | `xcom_push()` or return value | Build result + env inject | JSON on stdout (last line) |
+| **Input mechanism** | `env:` block + `$GITHUB_OUTPUT` | `xcom_pull()` | Env inject + parameters | Env vars + context file + template vars |
+| **Scope** | Step → Step (within job) | Task → Task (within DAG) | Build → Build | Execution → Execution (same task) |
+| **Storage** | Temp file per workflow run | Database (pluggable backend) | Build metadata | JSON file per task |
+| **Size limit** | Not documented | "Small data" warning | N/A | 64KB recommended |
+| **Serialization** | String key-value pairs | JSON-serializable | String | JSON object (dict) |
+| **Conditional logic** | `${{ if }}` expressions | Python conditions | `when` directive | `when: 'field == "value"'` |
+| **Complexity** | High (distributed runners) | High (distributed workers) | High (plugin system) | Low (single machine, single user) |
 
 ## Sources
 
-### High Confidence (Official Documentation)
+### High Confidence (Official Documentation / Stdlb)
 
-- **企业微信开发者中心 - 消息推送配置说明** (https://developer.work.weixin.qq.com/document/path/91770) — Webhook API specification, message types, rate limits. Last updated: 2025-08-07.
-- **企业微信开发者中心 - 发送应用消息** (https://developer.work.weixin.qq.com/document/path/90236) — Application message API, touser format, userid acquisition methods. Last updated: 2025-09-24.
-- **企业微信开发者中心 - 专区程序SDK下载** (https://developer.work.weixin.qq.com/document/path/100250) — Official Python SDK version 1.2.3 (2025-02-10), example code 2.1.1 (2025-07-17).
+- **Python 3.12 json module** (https://docs.python.org/3/library/json.html) — `json.loads()`, `json.dumps()` API. Stable since Python 3.0.
+- **Python 3.12 subprocess module** (https://docs.python.org/3/library/subprocess.html) — `subprocess.run(env=...)` parameter. Verified: `env` mapping is passed to `Popen`, replaces default `os.environ`.
+- **Python 3.12 re module** (https://docs.python.org/3/library/re.html) — `re.compile()` for expression parsing. Stable API.
+- **GitHub Actions: Workflow commands** (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) — `$GITHUB_OUTPUT` file-based output mechanism. Pattern: write `key=value` to file path from env var.
+- **Airflow XComs** (https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html) — Push/pull data passing pattern. Explicit serialization, small data recommendation, pluggable backends.
 
-### Medium Confidence (Community Sources)
+### Medium Confidence (Community / Verified)
 
-- **weworkapi_python GitHub** (https://github.com/sbzhu/weworkapi_python) — Official Python lib, last updated 2026-04-17, 608 stars. Actively maintained.
-- **Python 企业微信机器人 Webhook 自动化消息推送实战** (https://blog.csdn.net/weixin_29032337/article/details/158753068) — Webhook implementation examples, 2026-03-07.
-- **企业微信API接口发消息实战** (https://cloud.tencent.com/developer/article/2550910) — Application message flow with Java examples, 2025-08-02.
+- **simpleeval PyPI** (https://pypi.org/project/simpleeval/) — Version 1.0.7 (2026-03-16), MIT license, Python >=3.9. Safe expression evaluator. Evaluated and rejected for v3.0 (overkill for `==`/`!=` only).
+- **GitHub Actions: Passing job outputs** (https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/pass-job-outputs) — `GITHUB_OUTPUT` file path mechanism verified. Step writes `echo "key=value" >> "$GITHUB_OUTPUT"`.
 
 ### Low Confidence (Flagged for Validation)
 
-- **2026 年微信机器人开发指南：官方 iLink 协议详解** (https://zhuanlan.zhihu.com/p/2019677743126704371) — Mentions official WeChat Bot API (iLink) released 2026-03. **Needs verification**: Application process, feature set, production availability.
-- **微信接入AI避坑实战：ClawBot核心能力与封号风险解析** (https://blog.csdn.net/aidoudoulong/article/details/159430136) — 封号 risk analysis for personal WeChat solutions, 2026-03-24.
+- None — All recommendations are based on stdlib APIs or verified official documentation.
 
 ---
 
-## Open Questions
-
-1. **微信 iLink Official Bot API** - 2026年3月文章提到官方开放个人号Bot API，需要验证：
-   - 申请条件和流程
-   - 是否支持私聊消息发送
-   - 是否适合claw-cron的通知场景
-   - 如适用，可能成为未来私聊通知的解决方案
-
-2. **Webhook URL管理** - 当前设计中webhook_url存储在config.yaml，需要确认：
-   - 是否支持多个webhook（多个群）
-   - recipients数组格式：`["webhook:KEY1", "webhook:KEY2"]` vs full URLs
-
-3. **Markdown V2支持** - 文档提到markdown_v2（4096字节，不支持@和颜色），需要确认：
-   - 是否需要支持markdown_v2（vs markdown）
-   - 客户端版本兼容性要求
-
----
-
-*Stack research for: WeChat Channel & Capture Enhancement*
+*Stack research for: Command Task Context Mechanism (v3.0)*
 *Researched: 2026-04-17*

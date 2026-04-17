@@ -9,16 +9,16 @@
 
 ### Update Command (任务修改)
 
-- [ ] **UPD-01**: update 子命令入口 — 用户可通过 `claw-cron update <name>` 调用，name 为必传参数定位目标任务
-- [ ] **UPD-02**: 修改 cron 字段 — 通过 `--cron` 选项修改任务的 cron 表达式
-- [ ] **UPD-03**: 修改 enabled 字段 — 通过 `--enabled` 选项启用/禁用任务（布尔值）
-- [ ] **UPD-04**: 修改 message 字段 — 通过 `--message` 选项修改通知消息模板
-- [ ] **UPD-05**: 修改 script 字段 — 通过 `--script` 选项修改 command 类型任务的脚本内容
-- [ ] **UPD-06**: 修改 prompt 字段 — 通过 `--prompt` 选项修改 chat 类型任务的 prompt 内容
+- [x] **UPD-01**: update 子命令入口 — 用户可通过 `claw-cron update <name>` 调用，name 为必传参数定位目标任务
+- [x] **UPD-02**: 修改 cron 字段 — 通过 `--cron` 选项修改任务的 cron 表达式
+- [x] **UPD-03**: 修改 enabled 字段 — 通过 `--enabled` 选项启用/禁用任务（布尔值）
+- [x] **UPD-04**: 修改 message 字段 — 通过 `--message` 选项修改通知消息模板
+- [x] **UPD-05**: 修改 script 字段 — 通过 `--script` 选项修改 command 类型任务的脚本内容
+- [x] **UPD-06**: 修改 prompt 字段 — 通过 `--prompt` 选项修改 chat 类型任务的 prompt 内容
 
 ### Version (版本)
 
-- [ ] **VER-02**: 版本号升级到 0.3.1
+- [x] **VER-02**: 版本号升级到 0.3.1
 
 ## Future Requirements
 
@@ -40,13 +40,13 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UPD-01 | Phase 21 | Pending |
-| UPD-02 | Phase 21 | Pending |
-| UPD-03 | Phase 21 | Pending |
-| UPD-04 | Phase 21 | Pending |
-| UPD-05 | Phase 21 | Pending |
-| UPD-06 | Phase 21 | Pending |
-| VER-02 | Phase 21 | Pending |
+| UPD-01 | Phase 21 | Complete |
+| UPD-02 | Phase 21 | Complete |
+| UPD-03 | Phase 21 | Complete |
+| UPD-04 | Phase 21 | Complete |
+| UPD-05 | Phase 21 | Complete |
+| UPD-06 | Phase 21 | Complete |
+| VER-02 | Phase 21 | Complete |
 
 **Coverage:**
 - v3.1 requirements: 7 total
