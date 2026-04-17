@@ -57,12 +57,12 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CTX-01 | Phase 19 | Pending |
-| CTX-02 | Phase 18 | Pending |
+| CTX-02 | Phase 18 | ✓ Complete |
 | CTX-03 | Phase 19 | Pending |
 | CTX-04 | Phase 19 | Pending |
 | CTX-05 | Phase 19 | Pending |
-| CTX-06 | Phase 18 | Pending |
-| COND-01 | Phase 18 | Pending |
+| CTX-06 | Phase 18 | ✓ Complete |
+| COND-01 | Phase 18 | ✓ Complete |
 | COND-02 | Phase 20 | Pending |
 | COND-03 | Phase 20 | Pending |
 | VER-01 | Phase 20 | Pending |
