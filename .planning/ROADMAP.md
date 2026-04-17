@@ -52,7 +52,11 @@
 4. System automatically manages tenant_access_token lifecycle (acquisition and refresh)
 5. System handles Feishu API rate limits (5 QPS per user) with automatic retry
 
-**Plans:** TBD
+**Plans:** 2 plans in 2 waves
+
+**Plan List:**
+- [ ] 12-01-PLAN.md — Core FeishuChannel implementation with SDK integration
+- [ ] 12-02-PLAN.md — CLI integration for feishu channel (add/verify/capture)
 
 ---
 
@@ -80,7 +84,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 11. UX Improvements | 3/3 | Complete    | 2026-04-17 |
-| 12. Feishu Channel | 0/0 | Not started | - |
+| 12. Feishu Channel | 0/2 | Ready | - |
 | 13. Email Channel | 0/0 | Not started | - |
 
 ## Coverage
