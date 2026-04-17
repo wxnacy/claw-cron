@@ -93,6 +93,7 @@ def add(capture_openid: bool) -> None:
             "app_id": app_id,
             "client_secret": client_secret,
             "enabled": True,
+            "created_at": datetime.now().isoformat(),
         }
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
@@ -108,6 +109,7 @@ def add(capture_openid: bool) -> None:
             config["channels"] = {}
         config["channels"][channel_type] = {
             "enabled": True,
+            "created_at": datetime.now().isoformat(),
         }
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 已启用[/green]")

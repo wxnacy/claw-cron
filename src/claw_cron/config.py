@@ -29,6 +29,26 @@ _BUILTIN_CLIENTS: dict[str, str] = {
 }
 
 
+def migrate_config_add_created_at(config: dict[str, Any]) -> dict[str, Any]:
+    """Add created_at field to existing channel configurations.
+
+    Args:
+        config: Config dict to migrate.
+
+    Returns:
+        Migrated config dict with created_at added where missing.
+    """
+    from datetime import datetime
+
+    channels_config = config.get("channels", {})
+    for channel_id, channel_cfg in channels_config.items():
+        if isinstance(channel_cfg, dict) and "created_at" not in channel_cfg:
+            # Use current time for existing configs
+            channel_cfg["created_at"] = datetime.now().isoformat()
+
+    return config
+
+
 def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
     """Load global config from YAML file.
 
@@ -41,7 +61,12 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open() as f:
-        return yaml.safe_load(f) or {}
+        config = yaml.safe_load(f) or {}
+
+    # Apply migrations
+    config = migrate_config_add_created_at(config)
+
+    return config
 
 
 def save_config(config: dict[str, Any], path: Path = CONFIG_FILE) -> None:
