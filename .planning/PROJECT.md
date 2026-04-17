@@ -8,15 +8,14 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 
 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## Current Milestone: v3.0 Command 上下文机制
+## Current Milestone: v3.1 Update 命令
 
-**Goal:** 为 command 类型任务增加双向上下文机制，让脚本可获取系统状态并回传执行结果，实现条件化通知
+**Goal:** 增加 update 命令，支持修改已有任务的字段，版本升级到 0.3.1
 
 **Target features:**
-- script 通过环境变量、模板变量、上下文文件三种方式接收系统注入的上下文
-- script 通过 stdout 输出 JSON 回传上下文状态（同一任务多次执行间传递）
-- notify 增加 `when` 条件字段（简单表达式：`==` / `!=`），根据上下文决定是否发送通知
-- 内联模式为主（检查 + 通知在一个任务内完成）
+- 增加 `update` 子命令，必传 `name` 参数定位任务
+- 支持修改字段：cron、enabled、message、script、prompt
+- 版本号升级到 0.3.1
 
 ## Requirements
 
@@ -40,15 +39,18 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 - ✅ **v2.4 里程碑已完成** (2026-04-17)
   - 微信通道 & Capture 增强 (Phase 14-17)
 
-### Active (v3.0)
+- ✅ **v3.0 里程碑已完成** (2026-04-18)
+  - Command 上下文机制 (Phase 18-20)
 
-- [ ] 环境变量上下文注入（系统 → script）
-- [ ] 模板变量上下文注入（系统 → script）
-- [ ] 上下文文件注入（系统 → script）
-- [ ] JSON stdout 上下文回传（script → 系统）
-- [ ] 任务状态持久化（上下文存储）
-- [ ] notify when 条件判断（简单表达式）
-- [ ] 版本升级到 0.3.0
+### Active (v3.1)
+
+- [ ] update 子命令，必传 name 参数
+- [ ] 支持修改 cron 字段
+- [ ] 支持修改 enabled 字段
+- [ ] 支持修改 message 字段
+- [ ] 支持修改 script 字段
+- [ ] 支持修改 prompt 字段
+- [ ] 版本升级到 0.3.1
 
 ### Out of Scope
 
@@ -111,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 for v3.0 milestone start*
+*Last updated: 2026-04-18 for v3.1 milestone start*
