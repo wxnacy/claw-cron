@@ -61,6 +61,91 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 
 - `{{ date }}` - Current date (YYYY-MM-DD)
 - `{{ time }}` - Current time (HH:MM:SS)
+- `{{ context.KEY }}` - Task context value (e.g. `{{ context.signed_in }}`)
+
+## Context Injection (v3.0)
+
+Command tasks receive system context via environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `CLAW_TASK_NAME` | Task name |
+| `CLAW_TASK_TYPE` | Task type |
+| `CLAW_LAST_EXIT_CODE` | Exit code of previous run |
+| `CLAW_LAST_OUTPUT` | Output of previous run (max 4096 chars) |
+| `CLAW_EXECUTION_TIME` | Current execution timestamp |
+| `CLAW_EXECUTION_COUNT` | Total execution count |
+| `CLAW_LAST_EXECUTION_TIME` | Previous execution timestamp |
+| `CLAW_CONTEXT_FILE` | Path to full context JSON file |
+| `CLAW_CONTEXT_<KEY>` | Custom env vars from task `env` field |
+
+Custom env vars in task config:
+
+```yaml
+tasks:
+  - name: my-task
+    type: command
+    cron: "0 8 * * *"
+    env:
+      API_KEY: "abc123"      # injected as CLAW_CONTEXT_API_KEY
+      REGION: "us-east-1"    # injected as CLAW_CONTEXT_REGION
+    script: "curl -H 'X-Key: $CLAW_CONTEXT_API_KEY' https://api.example.com"
+```
+
+## Context Feedback (v3.0)
+
+Scripts can write back to context by printing JSON as the last line of stdout:
+
+```python
+import json
+
+result = do_something()
+# Last line must be valid JSON dict — gets merged into task context
+print(json.dumps({"signed_in": result, "last_status": "ok"}))
+```
+
+Context persists at `~/.config/claw-cron/context/{task_name}.json` and is available in subsequent runs via env vars and `{{ context.KEY }}` templates.
+
+## Conditional Notification (v3.0)
+
+Use `when` in notify config to suppress notifications based on context:
+
+```yaml
+notify:
+  channel: imessage
+  recipients: ["+8613812345678"]
+  when: "signed_in == false"   # only notify when condition is true
+```
+
+Supported operators: `==`, `!=`
+
+Supported value types: `true`/`false` (bool), integers, floats, strings
+
+**Behavior:**
+- `when` omitted → always notify (backward compatible)
+- Key missing in context → notify (conservative fallback)
+- Parse error → notify (conservative fallback)
+
+### Sign-in Task Example
+
+```yaml
+tasks:
+  - name: daily_signin
+    type: command
+    cron: "0 8 * * *"
+    script: python3 ~/scripts/signin.py
+    notify:
+      channel: imessage
+      recipients: ["+8613812345678"]
+      when: "signed_in == false"   # only notify on failure
+```
+
+```python
+# signin.py — last line must be JSON
+import json
+success = do_signin()
+print(json.dumps({"signed_in": success}))
+```
 
 ## Cron Expression
 
