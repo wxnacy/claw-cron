@@ -104,6 +104,44 @@ def add(capture_openid: bool) -> None:
             console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
             asyncio.run(_capture_qqbot_openid(alias="me"))
 
+    elif channel_type == "feishu":
+        app_id = click.prompt("App ID", type=str)
+        app_secret = click.prompt("App Secret", type=str, hide_input=True)
+
+        # Validate credentials before saving (per D-08)
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.post(
+                    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                    json={"app_id": app_id, "app_secret": app_secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+                if data.get("code", 0) != 0:
+                    raise click.ClickException(
+                        f"验证失败: {data.get('message', '未知错误')}"
+                    )
+                console.print("[green]✓ 凭证验证成功[/green]")
+            except httpx.RequestError as e:
+                raise click.ClickException(f"连接失败: {e}") from e
+
+        # Save to config.yaml
+        if "channels" not in config:
+            config["channels"] = {}
+        config["channels"][channel_type] = {
+            "app_id": app_id,
+            "app_secret": app_secret,
+            "enabled": True,
+            "created_at": datetime.now().isoformat(),
+        }
+        save_config(config)
+        console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
+
+        # Handle capture_openid flag
+        if capture_openid:
+            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
+            asyncio.run(_capture_feishu_openid(alias="me"))
+
     elif channel_type == "imessage":
         # iMessage doesn't require credentials
         if "channels" not in config:
@@ -115,10 +153,6 @@ def add(capture_openid: bool) -> None:
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 已启用[/green]")
         console.print("[dim]iMessage 无需配置凭证[/dim]")
-
-    else:
-        console.print(f"[yellow]通道 '{channel_type}' 的配置流程尚未实现[/yellow]")
-        console.print("[dim]将在后续版本中支持[/dim]")
 
 
 @channels.command("list")
@@ -154,6 +188,9 @@ def list_channels() -> None:
         # Get config display value
         channel_cfg = channels_config.get(channel_id, {})
         if channel_id == "qqbot":
+            app_id = channel_cfg.get("app_id", "")
+            config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id) or "-"
+        elif channel_id == "feishu":
             app_id = channel_cfg.get("app_id", "")
             config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id) or "-"
         elif channel_id == "imessage":
@@ -212,13 +249,14 @@ def delete(channel_type: str, force: bool) -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot", "imessage"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage"]))
 def verify(channel_type: str) -> None:
     """Verify channel credentials and connectivity.
 
-    CHANNEL_TYPE is the channel to verify (e.g., 'qqbot', 'imessage').
+    CHANNEL_TYPE is the channel to verify (e.g., 'qqbot', 'feishu', 'imessage').
 
     For QQ Bot: Validates app_id and client_secret with QQ API.
+    For Feishu: Validates app_id and app_secret with Feishu API.
     For iMessage: Checks if running on macOS with Messages app available.
     """
     config = load_config()
@@ -266,6 +304,40 @@ def verify(channel_type: str) -> None:
                 console.print(f"[red]✗ 连接失败: {e}[/red]")
                 raise SystemExit(1)
 
+    elif channel_type == "feishu":
+        feishu_config = channels_config["feishu"]
+        app_id = feishu_config.get("app_id")
+        app_secret = feishu_config.get("app_secret")
+
+        if not app_id or not app_secret:
+            console.print("[red]✗ 配置不完整：缺少 app_id 或 app_secret[/red]")
+            raise SystemExit(1)
+
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.post(
+                    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+                    json={"app_id": app_id, "app_secret": app_secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+
+                if data.get("code", 0) != 0:
+                    console.print(f"[red]✗ 验证失败: {data.get('message', '未知错误')}[/red]")
+                    console.print(f"[dim]错误码: {data.get('code')}[/dim]")
+                    raise SystemExit(1)
+
+                console.print("[green]✓ 凭证验证成功[/green]")
+                console.print(f"[dim]App ID: {app_id}[/dim]")
+
+                access_token = data.get("tenant_access_token", "")
+                if access_token:
+                    console.print(f"[dim]Tenant Access Token: {access_token[:20]}...[/dim]")
+
+            except httpx.RequestError as e:
+                console.print(f"[red]✗ 连接失败: {e}[/red]")
+                raise SystemExit(1)
+
     elif channel_type == "imessage":
         # iMessage doesn't require credentials, just check platform
         import platform
@@ -283,7 +355,7 @@ def verify(channel_type: str) -> None:
 @channels.command()
 @click.option(
     "--channel-type",
-    type=click.Choice(["qqbot"], case_sensitive=False),
+    type=click.Choice(["qqbot", "feishu"], case_sensitive=False),
     default="qqbot",
     help="Channel to capture openid from",
 )
@@ -306,6 +378,8 @@ def capture(channel_type: str, alias: str) -> None:
     """
     if channel_type == "qqbot":
         asyncio.run(_capture_qqbot_openid(alias))
+    elif channel_type == "feishu":
+        asyncio.run(_capture_feishu_openid(alias))
 
 
 async def _capture_qqbot_openid(alias: str) -> None:
@@ -377,6 +451,87 @@ async def _capture_qqbot_openid(alias: str) -> None:
         contact = Contact(
             openid=captured_openid,
             channel="qqbot",
+            alias=alias,
+            created=datetime.now().isoformat(),
+        )
+        save_contact(contact)
+        console.print(f"\n[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
+        console.print(f"[dim]You can now use 'claw-cron remind --recipient {alias}'[/dim]")
+
+
+async def _capture_feishu_openid(alias: str) -> None:
+    """Capture OpenID from Feishu WebSocket."""
+    import lark_oapi as lark
+
+    from claw_cron.feishu.events import parse_feishu_message
+
+    # Load config
+    config = load_config()
+    feishu_config = config.get("channels", {}).get("feishu", {})
+    app_id = feishu_config.get("app_id")
+    app_secret = feishu_config.get("app_secret")
+
+    if not app_id or not app_secret:
+        console.print("[red]Error: Feishu not configured.[/red]")
+        console.print("[dim]Run 'claw-cron channels add' first.[/dim]")
+        raise SystemExit(1)
+
+    captured_openid: str | None = None
+
+    def on_message_received(data: lark.im.v1.P2ImMessageReceiveV1) -> None:
+        nonlocal captured_openid
+        event_data = {
+            "sender": {
+                "sender_id": {
+                    "open_id": data.event.sender.sender_id.open_id
+                }
+            },
+            "message": {
+                "content": data.event.message.content,
+                "message_id": data.event.message.message_id,
+                "chat_id": data.event.message.chat_id,
+                "create_time": data.event.message.create_time,
+            },
+        }
+        message = parse_feishu_message(event_data)
+        captured_openid = message.openid
+        console.print(f"\n[green]✓ OpenID captured: [bold]{message.openid}[/bold][/green]")
+        console.print(f"[dim]Message content: {message.content}[/dim]")
+
+    event_handler = (
+        lark.EventDispatcherHandler.builder("", "")
+        .register_p2_im_message_receive_v1(on_message_received)
+        .build()
+    )
+
+    ws_client = lark.ws.Client(
+        app_id,
+        app_secret,
+        event_handler=event_handler,
+        log_level=lark.LogLevel.INFO,
+    )
+
+    console.print("\n[bold]Waiting for message...[/bold]")
+    console.print("[dim]Send any message to your Feishu bot to capture your openid.[/dim]")
+    console.print("[dim]Press Ctrl+C to cancel.[/dim]\n")
+
+    try:
+        async def wait_for_capture() -> None:
+            while not captured_openid:
+                await asyncio.sleep(0.5)
+
+        await asyncio.gather(
+            ws_client.start(),
+            wait_for_capture(),
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled.[/yellow]")
+        return
+
+    if captured_openid:
+        contact = Contact(
+            openid=captured_openid,
+            channel="feishu",
             alias=alias,
             created=datetime.now().isoformat(),
         )
