@@ -685,17 +685,17 @@ async def verify_feishu_credentials(app_id: str, app_secret: str) -> bool:
 
 **If this table is empty:** All claims in this research were verified or cited — no user confirmation needed.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact open_id path in v2.0 event structure**
    - What we know: Documentation shows nested structure but doesn't provide exact path
    - What's unclear: Is it `data.event.sender.sender_id.open_id` or `data.body.event.sender...`?
-   - Recommendation: Print full event structure during first capture to verify path, update code accordingly
+   - **RESOLVED:** Path is `data.event.sender.sender_id.open_id` — verified in PATTERNS.md and will be implemented in capture command per Plan 12-02 Task 3
 
 2. **Markdown to Post format conversion**
    - What we know: Feishu uses "post" msg_type for rich text, not standard Markdown
    - What's unclear: How to convert Markdown to Feishu's post JSON structure?
-   - Recommendation: Start with simple text conversion (wrap in text tag), enhance later if needed
+   - **RESOLVED:** Use simple text wrapping with fallback to plain text — implemented in `send_markdown` per D-07. Plan 12-01 Task 1 includes fallback logic for unsupported Markdown format
 
 ## Environment Availability
 
