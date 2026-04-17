@@ -16,10 +16,16 @@ from rich.table import Table
 
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
-from claw_cron.prompt import prompt_confirm, prompt_channel_select
+from claw_cron.prompt import prompt_confirm, prompt_channel_select, prompt_capture_channel_select
 from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
 
 console = Console()
+
+CHANNEL_DISPLAY_NAMES = {
+    "qqbot": "QQ Bot",
+    "feishu": "飞书",
+    "wechat": "企业微信",
+}
 
 
 @click.group()
@@ -37,13 +43,7 @@ def channels() -> None:
 
 
 @channels.command()
-@click.option(
-    "--capture-openid",
-    is_flag=True,
-    default=False,
-    help="Connect WebSocket to capture user openid after configuration",
-)
-def add(capture_openid: bool) -> None:
+def add() -> None:
     """Add a new message channel configuration.
 
     Interactive prompt to configure message channel credentials.
@@ -62,6 +62,29 @@ def add(capture_openid: bool) -> None:
         if not prompt_confirm(f"通道 '{channel_type}' 已配置，是否覆盖?"):
             console.print("[dim]已取消[/dim]")
             return
+
+    def _do_capture(ch_type: str) -> None:
+        from claw_cron.channels import get_channel
+        from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
+        display_name = CHANNEL_DISPLAY_NAMES.get(ch_type, ch_type)
+        ch = get_channel(ch_type)
+        console.print(f"\n[dim]请向你的 {display_name} 机器人发送任意消息[/dim]")
+        console.print("[dim]按 Ctrl+C 取消[/dim]\n")
+        try:
+            with console.status(f"[bold green]等待来自 {display_name} 的消息..."):
+                openid = asyncio.run(ch.capture_openid())
+            console.print(f"[green]✓ OpenID 已捕获: [bold]{openid}[/bold][/green]")
+            save_contact(Contact(openid=openid, channel=ch_type, alias="me", created=datetime.now().isoformat()))
+            console.print("[green]✓ 联系人已保存为 'me'[/green]")
+        except KeyboardInterrupt:
+            console.print("\n[yellow]已取消[/yellow]")
+        except ChannelError as e:
+            if "timed out" in str(e).lower():
+                console.print(f"\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
+            else:
+                console.print(f"[red]Capture 失败: {e}[/red]")
+        except ChannelConfigError as e:
+            console.print(f"[red]Capture 失败: {e}[/red]")
 
     # Channel-specific configuration flow
     if channel_type == "qqbot":
@@ -97,19 +120,8 @@ def add(capture_openid: bool) -> None:
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
 
-        # Handle capture_openid flag
-        if capture_openid:
-            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
-            from claw_cron.channels import get_channel
-            from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
-            ch = get_channel("qqbot")
-            try:
-                openid = asyncio.run(ch.capture_openid())
-                from claw_cron.contacts import Contact, save_contact
-                save_contact(Contact(openid=openid, channel="qqbot", alias="me", created=datetime.now().isoformat()))
-                console.print(f"[green]✓ OpenID 已捕获并保存: {openid}[/green]")
-            except (ChannelError, ChannelConfigError) as e:
-                console.print(f"[red]Capture 失败: {e}[/red]")
+        if prompt_confirm("是否立即获取用户 ID (capture)?"):
+            _do_capture("qqbot")
 
     elif channel_type == "feishu":
         app_id = click.prompt("App ID", type=str)
@@ -144,19 +156,8 @@ def add(capture_openid: bool) -> None:
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
 
-        # Handle capture_openid flag
-        if capture_openid:
-            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
-            from claw_cron.channels import get_channel
-            from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
-            ch = get_channel("feishu")
-            try:
-                openid = asyncio.run(ch.capture_openid())
-                from claw_cron.contacts import Contact, save_contact
-                save_contact(Contact(openid=openid, channel="feishu", alias="me", created=datetime.now().isoformat()))
-                console.print(f"[green]✓ OpenID 已捕获并保存: {openid}[/green]")
-            except (ChannelError, ChannelConfigError) as e:
-                console.print(f"[red]Capture 失败: {e}[/red]")
+        if prompt_confirm("是否立即获取用户 ID (capture)?"):
+            _do_capture("feishu")
 
     elif channel_type == "email":
         host = click.prompt("SMTP Host", type=str)
@@ -446,18 +447,12 @@ def verify(channel_type: str) -> None:
 
 @channels.command()
 @click.option(
-    "--channel-type",
-    type=click.Choice(["qqbot", "feishu"], case_sensitive=False),
-    default="qqbot",
-    help="Channel to capture openid from",
-)
-@click.option(
     "--alias",
     prompt="Save as contact alias",
     default="me",
     help="Alias name for the captured contact",
 )
-def capture(channel_type: str, alias: str) -> None:
+def capture(alias: str) -> None:
     """Connect to channel and capture user openid.
 
     This command starts a WebSocket connection and waits for you
@@ -471,18 +466,24 @@ def capture(channel_type: str, alias: str) -> None:
     from claw_cron.channels import get_channel
     from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
 
+    channel_type = prompt_capture_channel_select()
     channel = get_channel(channel_type)
+    display_name = CHANNEL_DISPLAY_NAMES.get(channel_type, channel_type)
 
     if not channel.supports_capture:
-        console.print(f"[yellow]通道 '{channel_type}' 不需要 capture[/yellow]")
+        reasons = {
+            "imessage": "iMessage 使用手机号直接发送，无需获取用户 ID",
+            "email": "邮件使用邮箱地址直接发送",
+        }
+        reason = reasons.get(channel_type, "此通道不需要 capture")
+        console.print(f"[yellow]此通道不需要 capture。{reason}[/yellow]")
         return
 
-    console.print(f"\n[bold]等待消息...[/bold]")
-    console.print(f"[dim]向你的 {channel_type} 机器人发送任意消息以捕获 openid[/dim]")
+    console.print(f"\n[dim]请向你的 {display_name} 机器人发送任意消息[/dim]")
     console.print("[dim]按 Ctrl+C 取消[/dim]\n")
 
     try:
-        with console.status(f"[bold green]等待来自 {channel_type} 的消息..."):
+        with console.status(f"[bold green]等待来自 {display_name} 的消息..."):
             openid = asyncio.run(channel.capture_openid())
         console.print(f"[green]✓ OpenID 已捕获: [bold]{openid}[/bold][/green]")
 
@@ -497,7 +498,13 @@ def capture(channel_type: str, alias: str) -> None:
         console.print(f"[dim]现在可以使用 'claw-cron remind --recipient {alias}'[/dim]")
     except KeyboardInterrupt:
         console.print("\n[yellow]已取消[/yellow]")
-    except (ChannelError, ChannelConfigError) as e:
+    except ChannelError as e:
+        if "timed out" in str(e).lower():
+            console.print(f"\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
+        else:
+            console.print(f"[red]Capture 失败: {e}[/red]")
+        raise SystemExit(1)
+    except ChannelConfigError as e:
         console.print(f"[red]Capture 失败: {e}[/red]")
         raise SystemExit(1)
 
