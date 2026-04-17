@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-04-18
+
+### Added
+- `update` command: modify existing task fields (`--cron`, `--enabled`, `--message`, `--script`, `--prompt`)
+
 ## [0.2.1] - 2026-04-17
 
 ### Added
