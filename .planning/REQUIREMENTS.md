@@ -7,7 +7,7 @@
 
 ### Version
 
-- [ ] **VERS-01**: 软件版本号升级到 0.2.1
+- [x] **VERS-01**: 软件版本号升级到 0.2.1
 
 ### Architecture
 
@@ -72,7 +72,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WECHAT-03 | Phase 16 | Pending |
 | WECHAT-04 | Phase 16 | Pending |
 | WECHAT-05 | Phase 16 | Pending |
-| VERS-01 | Phase 17 | Pending |
+| VERS-01 | Phase 17 | Complete |
 
 **Coverage:**
 - v2.4 requirements: 15 total
