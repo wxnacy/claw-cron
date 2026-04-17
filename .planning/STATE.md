@@ -2,20 +2,20 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Command 上下文机制
-status: planning
-last_updated: "2026-04-17T15:59:42.775Z"
-last_activity: 2026-04-17 — Phase 19 complete (Context Injection & Feedback)
+status: complete
+last_updated: "2026-04-18T00:05:47.526+08:00"
+last_activity: 2026-04-18 — Phase 20 complete (Conditional Notification & Release)
 progress:
   total_phases: 7
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
   percent: 100
 ---
 
 # Project State: claw-cron
 
-**Last Updated:** 2026-04-17
+**Last Updated:** 2026-04-18
 
 ## Project Reference
 
@@ -23,21 +23,21 @@ progress:
 
 **Current Milestone:** v3.0 Command 上下文机制
 
-**Current Focus:** Phase 20 — Conditional Notification & Release
+**Current Focus:** Milestone v3.0 Complete ✅
 
 ## Current Position
 
-Phase: 20 of 20 (Conditional Notification & Release)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-04-17 — Phase 19 complete (Context Injection & Feedback)
+Phase: 20 of 20 (Conditional Notification & Release) — COMPLETE
+Plan: 20-01 complete
+Status: All phases complete
+Last activity: 2026-04-18 — Phase 20 complete (Conditional Notification & Release)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
-**Velocity:** TBD (v3.0 milestone starting)
-**Cycle Time:** TBD
+**Velocity:** 3 phases in 1 day
+**Cycle Time:** ~1 day
 **Blocked Time:** 0h
 
 ## Accumulated Context
@@ -50,10 +50,11 @@ Progress: [░░░░░░░░░░] 0%
 - CTX-06 mapped to Phase 18 (context field + persistence enables feedback loop)
 - COND-01 mapped to Phase 18 (when field definition is the data model part)
 - COND-02/03 mapped to Phase 20 (runtime evaluation logic)
+- Conservative fallback in evaluate_when: send notification on parse error or missing key
 
 ### Active Todos
 
-- [ ] Plan Phase 18
+None
 
 ### Blockers
 
@@ -64,11 +65,14 @@ None
 **Recent Activity:**
 
 - 2026-04-17: Milestone v3.0 roadmap created — 3 phases (18-20), 10 requirements mapped
+- 2026-04-17: Phase 18 complete — Data Model & Context Storage
+- 2026-04-17: Phase 19 complete — Context Injection & Feedback
+- 2026-04-18: Phase 20 complete — Conditional Notification & Release, v0.3.0
 
 **Next Actions:**
 
-1. Plan Phase 18: Data Model & Context Storage
+1. Run `gsd-complete-milestone` to archive v3.0 and prepare next milestone
 
 ---
 
-*State updated: 2026-04-17*
+*State updated: 2026-04-18*

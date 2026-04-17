@@ -39,7 +39,7 @@
 
 - [x] **Phase 18: Data Model & Context Storage** - 扩展数据模型，支持上下文配置和持久化 *(completed 2026-04-17)*
 - [x] **Phase 19: Context Injection & Feedback** - 实现上下文注入与 JSON 回传 *(completed 2026-04-17)*
-- [ ] **Phase 20: Conditional Notification & Release** - 条件通知与版本发布
+- [x] **Phase 20: Conditional Notification & Release** - 条件通知与版本发布 *(completed 2026-04-18)*
 
 ## Phase Details
 
@@ -105,7 +105,7 @@ Phases execute in numeric order: 18 → 19 → 20
 |-------|-----------|----------------|--------|-----------|
 | 18. Data Model & Context Storage | v3.0 | 1/1 | Complete | 2026-04-17 |
 | 19. Context Injection & Feedback | v3.0 | 3/3 | Complete | 2026-04-17 |
-| 20. Conditional Notification & Release | v3.0 | 0/? | Not started | - |
+| 20. Conditional Notification & Release | v3.0 | 1/1 | Complete | 2026-04-18 |
 
 ## Coverage
 
@@ -122,9 +122,9 @@ Phases execute in numeric order: 18 → 19 → 20
 | CTX-05 | Phase 19 | ✓ Complete |
 | CTX-06 | Phase 18 | ✓ Complete |
 | COND-01 | Phase 18 | ✓ Complete |
-| COND-02 | Phase 20 | Pending |
-| COND-03 | Phase 20 | Pending |
-| VER-01 | Phase 20 | Pending |
+| COND-02 | Phase 20 | ✓ Complete |
+| COND-03 | Phase 20 | ✓ Complete |
+| VER-01 | Phase 20 | ✓ Complete |
 
 ---
 
