@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.3
-milestone_name: milestone
-status: completed
-last_updated: "2026-04-17T10:15:38.679Z"
+milestone: v2.4
+milestone_name: 微信通道 & Capture 增强
+status: planning
+last_updated: "2026-04-17T12:00:00.000Z"
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: claw-cron
@@ -20,23 +20,16 @@ progress:
 
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-**Current Milestone:** v2.3 邮件 & 飞书通道
+**Current Milestone:** v2.4 微信通道 & Capture 增强
 
-**Current Focus:** Phase 13 — email-channel
+**Current Focus:** Not started (defining requirements)
 
 ## Current Position
 
-Phase: 13 (email-channel) — EXECUTING
-Plan: 1 of 2
-**Phase:** 13
-**Plan:** Not started
-**Status:** Milestone complete
-**Progress:** ░░░░░░░░░░ 0%
-
-```
-Phase 12: Feishu Channel [██████████████████] 100%
-└─ 2/2 plans complete
-```
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-17 — Milestone v2.4 started
 
 ## Performance Metrics
 
@@ -48,15 +41,13 @@ Phase 12: Feishu Channel [██████████████████
 
 ### Decisions
 
-- Milestone v2.3 roadmap created with 3 phases (11-13)
-- Phase order: UX → Feishu → Email (as specified in instructions)
-- Coarse granularity applied: 3 phases for 13 requirements
+- Milestone v2.4 started after v2.3 completion
+- Focus on WeChat channel and capture enhancements
 
 ### Active Todos
 
-- [ ] Start Phase 11 planning
-- [ ] Implement InquirerPy selection for channels add
-- [ ] Add configuration status display to channels commands
+- [ ] Define requirements for v2.4
+- [ ] Create roadmap
 
 ### Blockers
 
@@ -66,14 +57,14 @@ None
 
 **Recent Activity:**
 
-- 2026-04-17: Milestone v2.3 roadmap created
-- Previous milestone v2.1 completed with Phase 10
+- 2026-04-17: Milestone v2.4 started
+- v2.3 completed with Email Channel (Phase 13)
 
 **Next Actions:**
 
-1. Run `gsd execute-phase 13` to start Email Channel
-2. Review REQUIREMENTS.md for EMAIL-01 to EMAIL-05
-3. Follow existing FeishuChannel patterns for consistency
+1. Define requirements
+2. Create roadmap
+3. Start Phase 14 planning
 
 ---
 

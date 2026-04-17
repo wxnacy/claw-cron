@@ -8,15 +8,15 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 
 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## Current Milestone: v2.3 邮件 & 飞书通道
+## Current Milestone: v2.4 微信通道 & Capture 增强
 
-**Goal:** 扩展消息通知能力，支持邮件和飞书通道，并改进交互体验
+**Goal:** 扩展消息通道能力，增加微信支持，优化 capture 交互体验
 
 **Target features:**
-- 邮件通道：SMTP 发送通知
-- 飞书通道：私聊通知（类似 QQ Bot 方式，需调研）
-- channels add 交互改进：列表选择 + 配置状态展示
-- channels list 改进：显示每个通道的配置状态
+- 软件版本升级到 0.2.1
+- channels capture 支持飞书（交互式列表选择）
+- channels 增加微信通道支持
+- channels add 验证成功后自动触发 capture 流程
 
 ## Requirements
 
@@ -34,20 +34,26 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
   - 通道管理命令 (Phase 9)
   - WebSocket & OpenID 捕获
 
-### Active (v2.3)
+- ✅ **v2.3 里程碑已完成** (2026-04-17)
+  - UX 改进 (Phase 11)
+  - 飞书通道 (Phase 12)
+  - 邮件通道 (Phase 13)
 
-- [ ] 邮件通道实现
-- [ ] 飞书通道实现
-- [ ] channels add 交互改进
-- [ ] channels list 状态展示
+### Active (v2.4)
+
+- [ ] 软件版本升级到 0.2.1
+- [ ] channels capture 飞书支持
+- [ ] 微信通道实现
+- [ ] channels add 后自动 capture 流程
 
 ### Out of Scope
 
 - 系统 crontab 集成 — 项目自管理调度，不依赖 crontab
 - Web UI — CLI 优先
 - 多用户/权限管理 — 单用户本地工具
-- 微信通道 — 后续扩展
 - 消息接收/远程控制 — 仅支持发送通知
+- 钉钉通道 — 后续扩展
+- Telegram 通道 — 后续扩展
 
 ## Context
 
@@ -96,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 for v2.3 milestone start*
+*Last updated: 2026-04-17 for v2.4 milestone start*
