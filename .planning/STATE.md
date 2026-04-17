@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.4
-milestone_name: 微信通道 & Capture 增强
+milestone_name: milestone
 status: planning
-last_updated: "2026-04-17T12:00:00.000Z"
+last_updated: "2026-04-17T11:00:55.660Z"
+last_activity: 2026-04-17 — Roadmap created for v2.4
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
-  percent: 0
 ---
 
 # Project State: claw-cron
