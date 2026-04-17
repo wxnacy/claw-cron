@@ -1,278 +1,354 @@
 # Pitfalls Research
 
-**Domain:** 邮件和飞书通知通道集成
+**Domain:** 微信通道 & Capture 增强
 **Researched:** 2026-04-17
-**Confidence:** HIGH (基于官方文档和实战经验)
+**Confidence:** MEDIUM (基于官方文档和社区实践，部分 WebSearch 未验证)
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: SMTP 凭证明文存储在配置文件
+### Pitfall 1: 个人微信封号风险
 
 **What goes wrong:**
-将 SMTP 密码/App Password 直接写入 `tasks.yaml` 或代码中，导致：
-- Git 提交后凭证泄露到版本控制
-- 公开仓库暴露邮件服务器访问权限
-- 攻击者利用凭证发送钓鱼邮件
+使用个人微信机器人方案（如 wechat-bridge、Hook、逆向协议）发送定时任务通知，导致账号被风控或封禁。
 
 **Why it happens:**
-开发者为方便测试，直接硬编码凭证，忘记移除就提交代码
+- 个人微信 API 不是官方开放接口，腾讯严厉打击自动化行为
+- 定时高频发送消息触发风控系统（批量营销特征）
+- 2026年3月虽然官方开放了 iLink 协议，但仍有限制：
+  - 仅限特定场景（AI 助理对话）
+  - 不适合定时任务通知（单向推送）
 
 **How to avoid:**
-1. 使用环境变量存储所有敏感凭证
-   - `CLAW_CRON_SMTP_PASSWORD`
-   - `CLAW_CRON_SMTP_USERNAME`
-2. 参考 QQBot 的配置模式：使用 `pydantic_settings.BaseSettings` + 环境变量前缀
-3. 在 `.env.example` 中提供模板，`.env` 加入 `.gitignore`
-4. 配置验证时检查环境变量而非配置文件值
+- **必须使用企业微信应用机器人**（官方 API，合规稳定）
+- 不使用任何 Hook、协议破解、RPA 工具
+- 如需个人微信，仅用于测试，频率控制在每日 < 5 条
 
 **Warning signs:**
-- 配置文件中包含明文密码
-- Git diff 显示密码提交
-- `.gitignore` 中缺少 `.env`
+- 账号收到"账号异常"警告
+- 发送消息延迟严重（风控拦截）
+- 好友无法收到消息（已被限流）
 
 **Phase to address:**
-Phase 1 (通道基础架构) - 在 EmailChannel 配置类设计时就使用环境变量
+**Phase 14 (微信通道实现)** — 架构设计阶段就确定使用企业微信，不提供个人微信选项
 
 ---
 
-### Pitfall 2: 忽略 SMTP 临时失败 (4xx) 和永久失败 (5xx) 的区别
+### Pitfall 2: 企业微信群机器人 vs 应用机器人选择错误
 
 **What goes wrong:**
-- 所有失败都重试 → 永久失败的邮箱（不存在、已停用）浪费重试资源
-- 所有失败都不重试 → 临时限流导致的通知丢失
-- 没有退信处理 → 无效邮箱累积，影响发送信誉
+选择企业微信群机器人 webhook 实现通知功能，发现：
+- 无法发送私聊消息（仅群聊）
+- 无法获取用户 open_id（无 WebSocket 事件）
+- 消息类型受限（不支持卡片、文件等）
+- 外部客户群推送受限（仅内部群）
 
 **Why it happens:**
-开发者不熟悉 SMTP 错误码体系，将邮件发送当作"成功/失败"二元操作
+混淆了两种机器人类型：
+
+| 特性 | 群机器人 | 应用机器人 |
+|-----|---------|-----------|
+| **通信方式** | Webhook（单向推送） | API + WebSocket（双向） |
+| **私聊支持** | ❌ 不支持 | ✅ 支持 |
+| **open_id 获取** | ❌ 无法获取 | ✅ 通过 WebSocket 事件 |
+| **消息类型** | 文本、Markdown、图片 | 全类型（卡片、文件、模板） |
+| **适用场景** | 群通知广播 | 个人定时提醒 |
 
 **How to avoid:**
-1. **区分错误类型**：
-   - **4xx (临时失败)**：自动重试，指数退避
-     - 421: 临时限流 → 减少发送频率，稍后重试
-     - 450: 连接过多 → 延长重试间隔
-     - 451: 服务器临时错误 → 自动重试（最多 72 小时）
-   - **5xx (永久失败)**：不重试，记录并清理
-     - 550: 邮箱不可用 → 标记为无效
-     - 551: 用户不存在 → 从通知列表移除
-     - 553: 无效邮箱格式 → 记录错误日志
-
-2. **实现退信跟踪**：
-   ```python
-   # 伪代码示例
-   async def handle_smtp_error(error_code: int, recipient: str):
-       if 400 <= error_code < 500:
-           return await retry_with_backoff(...)
-       elif 500 <= error_code < 600:
-           mark_recipient_invalid(recipient)
-           return MessageResult(success=False, permanent_failure=True)
-   ```
-
-3. **提供退信统计**：
-   - 记录连续失败次数
-   - 达到阈值后自动禁用该收件人
+- **定时任务通知场景 → 必须使用应用机器人**
+- 群机器人仅用于测试或"推送到群"场景
+- 在 `channels add` 流程中明确区分：
+  - `wechat-work-app` — 企业微信应用（推荐）
+  - `wechat-work-webhook` — 群机器人（受限场景）
 
 **Warning signs:**
-- 日志显示同一邮箱反复失败
-- 重试队列无限增长
-- 没有永久失败的处理逻辑
+- 用户问"如何发送私聊" → 选错了机器人类型
+- capture 流程无法获取 open_id → 群机器人不支持
 
 **Phase to address:**
-Phase 2 (邮件通道实现) - 在错误处理逻辑中实现区分处理
+**Phase 14 (微信通道实现)** — 只实现应用机器人，群机器人标记为 "future work"
 
 ---
 
-### Pitfall 3: 飞书机器人未订阅必需事件
+### Pitfall 3: API 频率限制未处理导致通知丢失
 
 **What goes wrong:**
-- WebSocket 连接成功，但收不到任何用户消息
-- 机器人配置完成，测试时无响应
-- 日志显示 "ws client ready" 但没有后续事件
+定时任务批量执行时（如每分钟提醒 10 个用户），企业微信 API 返回 45009 错误（频率限制），通知丢失。
 
 **Why it happens:**
-飞书采用事件推送机制，必须在开发者后台主动订阅事件，否则飞书不会推送消息
+企业微信 API 有限制：
+- access_token 有效期 2 小时，需提前刷新
+- 消息发送频率限制（具体 QPS 未公开，实测约 30 次/分钟）
+- 单个用户接收频率限制（防骚扰）
 
 **How to avoid:**
-1. **必需的事件订阅**：
-   - `im.message.receive_v1` - 接收用户消息（必需）
+**分级超时 + 熔断降级策略**（参考微信 API 最佳实践）：
 
-2. **配置步骤清单**：
-   - [ ] 飞书开发者后台 → 事件与回调
-   - [ ] 订阅方式：选择"使用长连接接收事件/回调"
-   - [ ] 添加事件：`im.message.receive_v1`
-   - [ ] **必须发布版本**才能生效
+```python
+# 超时配置
+WECHAT_TIMEOUTS = {
+    "get_token": {"connect": 1.0, "read": 2.0},
+    "send_message": {"connect": 2.0, "read": 10.0},
+    "default": {"connect": 3.0, "read": 5.0},
+}
 
-3. **参考 QQBot 模式**：
-   QQBot 使用 WebSocket 捕获 OpenID，FeishuChannel 可采用类似方式：
-   - 启动时连接 WebSocket
-   - 接收事件以获取用户 open_id
-   - 使用 open_id 发送私聊消息
+# 熔断配置（参考 Resilience4j）
+CIRCUIT_BREAKER = {
+    "failure_rate_threshold": 50,  # 失败率 > 50% 开启熔断
+    "wait_duration": 30,           # 熔断后等待 30 秒
+    "sliding_window_size": 10,     # 最近 10 次调用
+    "minimum_calls": 5,            # 至少 5 次才计算
+}
+
+# 降级策略
+async def send_with_fallback(recipient: str, content: str):
+    try:
+        return await wechat_channel.send_text(recipient, content)
+    except RateLimitError:
+        # 降级到备用通道（如 QQ Bot）
+        return await fallback_channel.send_text(recipient, content)
+    except CircuitBreakerOpen:
+        # 记录到队列，稍后重试
+        await retry_queue.add({"recipient": recipient, "content": content})
+        return MessageResult(success=True, error="Queued for retry")
+```
+
+**关键预防措施：**
+1. **Token 缓存 + 预刷新**：提前 30 秒刷新 access_token
+2. **指数退避重试**：失败后 1s → 2s → 4s → 8s（最多 3 次）
+3. **降级通道**：企业微信失败 → 降级到 QQ Bot 或邮件
+4. **异步队列**：高并发时不直接调用 API，先入队再处理
 
 **Warning signs:**
-- WebSocket 连接正常但无事件日志
-- 开发者后台未配置事件订阅
-- 配置变更后未发布版本
+- 日志中出现大量 45009 错误
+- 消息延迟超过 1 分钟
+- 用户反馈"没收到提醒"
 
 **Phase to address:**
-Phase 3 (飞书通道实现) - 在实现时确保事件订阅配置完整
+**Phase 14 (微信通道实现)** — 在 `WeChatWorkChannel` 中实现完整的重试、熔断、降级逻辑
 
 ---
 
-### Pitfall 4: 飞书 token 过期导致批量通知失败
+### Pitfall 4: Capture 流程用户不知道下一步该做什么
 
 **What goes wrong:**
-- `tenant_access_token` 默认 2 小时过期
-- 缓存的 token 过期后，所有发送请求失败
-- 错误码：99991663 (访问凭证无效)、99991665 (tenant_access_token 非法)
+用户执行 `claw-cron channels capture --channel-type wechat-work` 后：
+- 看到提示 "Waiting for message..."
+- 不知道要打开企业微信发送消息给机器人
+- 以为程序卡死，直接 Ctrl+C 退出
+- capture 失败，无法保存 contact
 
 **Why it happens:**
-开发者缓存 token 后忘记实现自动刷新机制
+- 提示信息不明确，缺少操作指引
+- 用户不了解 WebSocket 工作原理
+- 没有进度反馈（如倒计时、状态更新）
 
 **How to avoid:**
-1. **参考 QQBot 的 Token 管理**：
-   ```python
-   @dataclass
-   class TokenInfo:
-       access_token: str
-       expires_at: float  # Unix timestamp
-       buffer_seconds: int = 60  # 提前 60 秒刷新
+**改进 capture 交互流程**（参考 QQ Bot 现有实现，进一步优化）：
 
-       def is_expired(self) -> bool:
-           return time.time() >= (self.expires_at - self.buffer_seconds)
-   ```
+```python
+async def _capture_wechat_work_openid(alias: str):
+    # 1. 清晰的分步指引
+    console.print("\n[bold cyan]步骤 1/2: 启动消息监听[/bold cyan]")
+    console.print("[dim]正在连接企业微信 WebSocket...[/dim]\n")
+    
+    # 2. 显式的操作说明（带示例）
+    console.print("[bold yellow]步骤 2/2: 发送消息给机器人[/bold yellow]")
+    console.print("[green]请按以下步骤操作：[/green]")
+    console.print("  1. 打开 [bold]企业微信[/bold] 手机 App 或桌面客户端")
+    console.print("  2. 找到机器人应用（名称：claw-cron）")
+    console.print("  3. 发送任意消息（如：[dim]test[/dim]）")
+    console.print("\n[dim]示例：在机器人对话框输入 'capture' 或 'hello'[/dim]\n")
+    
+    # 3. 实时状态反馈
+    with console.status("[bold green]等待消息中... (Ctrl+C 取消)[/bold green]"):
+        # WebSocket 监听逻辑
+    
+    # 4. 超时提醒（可选）
+    if timeout > 300:  # 5 分钟
+        console.print("[yellow]⏱ 等待时间较长，请检查：[/yellow]")
+        console.print("  - 机器人是否已添加到通讯录")
+        console.print("  - 企业微信网络是否正常")
+```
 
-2. **实现自动刷新**：
-   - 发送前检查 `token.is_expired()`
-   - 过期则调用刷新接口
-   - 使用锁机制避免并发刷新
-
-3. **错误码识别**：
-   - 遇到 99991663/99991665 → 立即刷新 token 并重试一次
+**优化要点：**
+1. **分步指引**：明确当前步骤和下一步操作
+2. **带示例的操作说明**：降低理解门槛
+3. **实时状态**：显示 spinner + 等待时间
+4. **超时提示**：长时间无响应时给出诊断建议
 
 **Warning signs:**
-- 运行一段时间后突然全部失败
-- 错误日志显示 "访问凭证无效"
-- 没有提前刷新机制（buffer_seconds）
+- 用户反馈 "capture 一直卡住"
+- capture 成功率低（< 50%）
+- 用户多次执行 capture（之前失败了）
 
 **Phase to address:**
-Phase 3 (飞书通道实现) - 参考 QQBot 的 token 管理实现
+**Phase 15 (自动 capture 流程)** — 在 `channels add` 成功后自动触发 capture，提供更好的指引
 
 ---
 
-### Pitfall 5: 飞书用户不在应用可用范围内
+### Pitfall 5: 不同通道 capture 流程不一致导致混淆
 
 **What goes wrong:**
-- 配置了正确的 open_id，但发送失败
-- 错误码：230013 (机器人无权访问该用户)、230029 (用户已离职)
-- 测试环境正常，生产环境失败
+用户配置了 QQ Bot 和企业微信两个通道，capture 流程差异大：
+- QQ Bot：需要扫码授权 → 发送消息
+- 企业微信：需要添加机器人到通讯录 → 发送消息
+- 飞书：需要搜索机器人 → 发送消息
+
+用户在不同通道间混淆操作步骤，浪费时间。
 
 **Why it happens:**
-飞书机器人只能向"应用可用范围"内的用户发送私聊消息，管理员未正确配置范围
+- 各通道的 WebSocket 实现不同（QQ Bot 自建，飞书用 lark-oapi，企业微信用企业微信 SDK）
+- 提示信息没有统一模板
+- 没有提供通道差异对比表
 
 **How to avoid:**
-1. **发送前验证**：
-   - 使用 `contact:contact.base:readonly` 权限查询用户信息
-   - 验证用户是否在可用范围内
+**统一 capture 流程模板 + 通道差异说明**：
 
-2. **友好的错误处理**：
-   - 捕获 230013 错误 → 提示"用户未在应用可用范围内，请联系管理员"
-   - 捕获 230029 错误 → 提示"用户已离职，无法发送通知"
+```python
+# 统一的 capture 模板
+CAPTURE_TEMPLATES = {
+    "qqbot": {
+        "step1": "添加 QQ Bot 为好友",
+        "step1_detail": "在 QQ 搜索 Bot ID: {app_id}",
+        "step2": "发送任意消息给 Bot",
+        "timeout_hint": "如果 5 分钟未响应，请检查 Bot 是否在线",
+    },
+    "wechat-work": {
+        "step1": "添加机器人到通讯录",
+        "step1_detail": "在企业微信通讯录中搜索 'claw-cron'",
+        "step2": "发送任意消息给机器人",
+        "timeout_hint": "如果 5 分钟未响应，请检查机器人是否已启用",
+    },
+    "feishu": {
+        "step1": "搜索机器人",
+        "step1_detail": "在飞书搜索栏输入机器人名称",
+        "step2": "发送任意消息",
+        "timeout_hint": "确保机器人已启用并分配了权限",
+    },
+}
 
-3. **配置建议**：
-   - 开发者后台 → 应用可用范围 → 设置为"全部成员"
-   - 或明确指定需要通知的部门/用户
+async def capture_with_template(channel_type: str, config: dict):
+    template = CAPTURE_TEMPLATES[channel_type]
+    
+    console.print(f"\n[bold cyan]配置通道: {channel_type}[/bold cyan]\n")
+    
+    # Step 1
+    console.print(f"[bold yellow]步骤 1: {template['step1']}[/bold yellow]")
+    console.print(f"  {template['step1_detail'].format(**config)}\n")
+    
+    # Step 2
+    console.print(f"[bold yellow]步骤 2: {template['step2']}[/bold yellow]")
+    console.print(f"  [dim]示例：发送 'test' 或任意文字[/dim]\n")
+    
+    # Timeout hint (动态显示)
+    console.print(f"[dim]💡 提示: {template['timeout_hint']}[/dim]\n")
+```
 
-**Warning signs:**
-- 部分用户能收到，部分收不到
-- 错误日志显示 230013
-- 应用可用范围配置为"指定部门"
+**额外优化：**
+- 在 `channels list` 输出中显示各通道的 capture 状态
+- 提供帮助命令：`claw-cron channels capture --help-wechat-work`
 
 **Phase to address:**
-Phase 3 (飞书通道实现) - 在配置验证和错误处理中覆盖
+**Phase 15 (自动 capture 流程)** — 重构所有通道的 capture 流程，使用统一模板
 
 ---
 
-### Pitfall 6: 忽略飞书频率限制 (5 QPS per user)
+### Pitfall 6: 网络超时导致 capture 失败
 
 **What goes wrong:**
-- 批量发送通知时触发限流
-- 错误码：230020 (触发频率限制)
-- 部分用户收不到通知
+WebSocket 连接建立后，企业微信服务器响应慢或网络抖动，导致：
+- 连接建立超时（> 30 秒）
+- 消息事件丢失（用户发了消息但没捕获到）
+- capture 永远等待（没有超时机制）
 
 **Why it happens:**
-飞书对向同一用户发送消息限频 5 QPS，批量发送未做速率控制
+- WebSocket 是长连接，默认无超时
+- 网络不稳定（如公司内网限制 WebSocket）
+- 企业微信服务器高峰期响应慢
 
 **How to avoid:**
-1. **参考 QQBot 的重试机制**：
-   ```python
-   @retry(
-       stop=stop_after_attempt(3),
-       wait=wait_exponential(multiplier=1, min=1, max=10),
-       retry=retry_if_exception_type(RateLimitError),
-   )
-   async def _send_with_retry(self, endpoint, payload):
-       ...
-   ```
+**WebSocket 超时 + 重连 + 降级策略**（参考 webhook best practices）：
 
-2. **实现速率限制**：
-   - 使用 `asyncio.Semaphore` 控制并发
-   - 或在批量发送时添加延迟（每用户间隔 200ms）
+```python
+async def capture_with_timeout(channel_type: str, alias: str, timeout: int = 300):
+    """带超时和重试的 capture 流程"""
+    
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        console.print(f"\n[cyan]尝试 {attempt}/{max_attempts}[/cyan]")
+        
+        try:
+            # 设置总超时（5 分钟）
+            async with asyncio.timeout(timeout):
+                result = await _do_capture(channel_type, alias)
+                if result:
+                    return result
+                    
+        except TimeoutError:
+            console.print(f"[yellow]⏱ 超时 ({timeout}s)，尝试重连...[/yellow]")
+            
+            # 提供诊断建议
+            if attempt == max_attempts:
+                console.print("\n[red]多次超时，可能原因：[/red]")
+                console.print("  1. 网络限制 WebSocket 连接（尝试切换网络）")
+                console.print("  2. 企业微信服务不可用（查看官方状态页）")
+                console.print("  3. 机器人未正确配置（运行 `channels verify`）")
+                raise CaptureTimeoutError(f"Capture failed after {max_attempts} attempts")
+                
+        except ConnectionError as e:
+            console.print(f"[red]连接失败: {e}[/red]")
+            await asyncio.sleep(5 * attempt)  # 指数退避
+            
+    raise CaptureError("All attempts failed")
 
-3. **识别限流错误码**：
-   - Feishu: 230020
-   - QQBot: 22009, 20028, 304045-304050
-   - SMTP: 421, 450
+async def _do_capture(channel_type: str, alias: str) -> str | None:
+    """实际的 capture 逻辑（带心跳检测）"""
+    
+    ws_client = create_websocket_client(channel_type)
+    captured_openid = None
+    
+    # 心跳检测（每 30 秒）
+    async def heartbeat():
+        while not captured_openid:
+            await asyncio.sleep(30)
+            if ws_client.is_connected:
+                console.print("[dim]💓 WebSocket 连接正常[/dim]")
+            else:
+                console.print("[yellow]⚠ 连接已断开[/yellow]")
+                break
+    
+    async def on_message(message):
+        nonlocal captured_openid
+        captured_openid = message.openid
+        console.print(f"[green]✓ OpenID: {message.openid}[/green]")
+    
+    ws_client.on_message = on_message
+    
+    # 并发执行：WebSocket 连接 + 心跳 + 等待捕获
+    await asyncio.gather(
+        ws_client.connect(),
+        heartbeat(),
+        wait_for_capture(lambda: captured_openid),
+    )
+    
+    return captured_openid
+```
+
+**关键预防措施：**
+1. **总超时限制**：5 分钟（可配置）
+2. **自动重连**：最多 3 次，指数退避
+3. **心跳检测**：每 30 秒检查连接状态
+4. **诊断建议**：失败时提供可能原因和解决方法
 
 **Warning signs:**
-- 批量通知时部分失败
-- 日志显示频率限制错误码
-- 没有速率控制逻辑
+- capture 执行时间超过 5 分钟
+- 日志中频繁出现 "Connection lost"
+- 用户反馈"发了消息但没反应"
 
 **Phase to address:**
-Phase 2-3 (邮件和飞书通道实现) - 在发送逻辑中实现速率控制
-
----
-
-### Pitfall 7: 多通道错误处理不一致
-
-**What goes wrong:**
-- QQBot 返回 `MessageResult(success=False, error=str)`
-- Email 抛出异常
-- Feishu 返回不同的错误格式
-- 上层调度器无法统一处理失败情况
-
-**Why it happens:**
-每个通道独立实现，没有遵循统一的错误处理接口
-
-**How to avoid:**
-1. **统一错误类型**：
-   参考 `channels/exceptions.py` 中的异常层级：
-   - `ChannelConfigError` - 配置错误（不重试）
-   - `ChannelAuthError` - 认证错误（不重试，或刷新 token 后重试一次）
-   - `ChannelSendError` - 发送错误（可重试）
-
-2. **统一返回结构**：
-   ```python
-   @dataclass
-   class MessageResult:
-       success: bool
-       message_id: str | None = None
-       error: str | None = None
-       permanent_failure: bool = False  # 是否永久失败
-       raw_response: dict | None = None
-   ```
-
-3. **每个通道实现**：
-   - 捕获所有异常
-   - 转换为统一的 `MessageResult`
-   - 标记 `permanent_failure` 以便上层决定是否重试
-
-**Warning signs:**
-- 调度器中出现大量 `try-except` 处理不同通道
-- 某个通道失败导致整个通知流程中断
-- 无法区分临时失败和永久失败
-
-**Phase to address:**
-Phase 1 (通道基础架构) - 在 MessageChannel 基类中定义统一接口
+**Phase 15 (自动 capture 流程)** — 在 capture 实现中加入超时、重连、心跳机制
 
 ---
 
@@ -282,11 +358,11 @@ Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| SMTP 凭证硬编码在配置文件 | 快速测试，无需配置环境变量 | 凭证泄露风险，代码不可公开 | **Never** - 必须使用环境变量 |
-| 所有失败都重试 3 次 | 简化错误处理逻辑 | 浪费资源在无效邮箱，污染日志 | **Never** - 必须区分临时/永久失败 |
-| 忽略飞书事件订阅，直接发送 | 跳过配置步骤 | 无法获取用户 open_id，私聊功能受限 | 仅限群组通知场景 |
-| Token 不缓存，每次都刷新 | 避免过期问题 | API 调用翻倍，可能触发限流 | 仅限 MVP 测试 |
-| 统一错误处理留到后期 | 快速完成功能 | 多个通道错误处理逻辑分散，重构成本高 | **Never** - 必须在 Phase 1 定义统一接口 |
+| **直接调用企业微信 API，不缓存 token** | 减少代码复杂度 | 频繁获取 token 触发限流，性能下降 | **Never** — 必须实现 token 缓存 |
+| **capture 无超时限制** | 简化实现 | 用户不知道何时失败，浪费时间 | **Never** — 必须设置超时（默认 5 分钟） |
+| **只用一种通道（如 QQ Bot）** | 开发快，测试简单 | 无法降级，单点故障 | **MVP only** — 生产环境需多通道降级 |
+| **忽略 webhook 签名验证** | 减少配置步骤 | 安全漏洞，可能被伪造消息攻击 | **测试环境 only** — 生产必须验证签名 |
+| **日志只记录成功/失败** | 日志量少 | 无法诊断问题根因 | **Never** — 必须记录详细上下文（recipient, error_code, latency） |
 
 ---
 
@@ -296,14 +372,12 @@ Common mistakes when connecting to external services.
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| **SMTP** | 忽略发件人身份验证 (Sender Identity) | 配置 SPF/DKIM，验证发件人邮箱 |
-| **SMTP** | 发送大量邮件不预热 IP | IP 预热，逐步增加发送量 |
-| **SMTP** | 错误处理不区分 4xx/5xx | 参考本文 Pitfall 2 |
-| **Feishu** | 未订阅 `im.message.receive_v1` 事件 | 在开发者后台配置事件订阅并发布版本 |
-| **Feishu** | 使用 `user_id` 而非 `open_id` | 使用 `open_id`（用户在应用中的唯一标识） |
-| **Feishu** | 用户不在应用可用范围内 | 配置应用可用范围为"全部成员"或明确指定用户 |
-| **Feishu** | 修改权限后未发布版本 | 所有配置变更后必须创建版本并发布 |
-| **Multi-Channel** | 每个通道错误处理方式不同 | 使用统一的 `MessageResult` 和异常层级 |
+| **企业微信应用** | 混淆 AgentId 和 CorpId | CorpId 在企业信息页，AgentId 在应用详情页 |
+| **企业微信 token** | 不刷新，导致 2 小时后失效 | 缓存 token，提前 30 秒刷新（expires_in - 60s） |
+| **企业微信 open_id** | 以为 open_id 跨应用通用 | open_id 是机器人维度的，不同应用 open_id 不同 |
+| **WebSocket 连接** | 不处理断线重连 | 实现心跳检测 + 自动重连（指数退避） |
+| **消息发送频率** | 批量发送不间隔 | 高频场景使用队列 + 限流（如 10 条/分钟） |
+| **错误码处理** | 只判断 HTTP 状态码 | 企业微信返回的是业务错误码（如 45009），需解析 JSON |
 
 ---
 
@@ -313,11 +387,10 @@ Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| **同步发送多个通知** | 通知延迟累积，单个通道慢影响全部 | 使用 `asyncio.gather()` 并发发送，或消息队列 | >10 个并发通知 |
-| **SMTP 无连接池** | 每次发送都建立新连接，延迟高 | 使用 `aiosmtplib` 连接池 | >5 封/分钟 |
-| **Token 不缓存** | API 调用翻倍，响应时间增加 | 参考 QQBot 的 TokenInfo 缓存机制 | 持续运行 >1 小时 |
-| **忽略速率限制** | 频繁触发限流，部分通知丢失 | 使用 `asyncio.Semaphore` 或间隔延迟 | 飞书：>5 QPS/user，SMTP：依服务商而定 |
-| **无退信处理** | 无效邮箱累积，发送信誉下降 | 记录失败次数，自动禁用连续失败的收件人 | 累积 >100 个无效邮箱 |
+| **单线程发送消息** | 定时任务多时延迟严重 | 使用异步队列 + 并发发送 | > 10 个任务/分钟 |
+| **同步验证凭证** | `channels add` 卡顿 | 验证请求设置 5s 超时，后台异步验证 | 网络慢时明显 |
+| **capture 无并发限制** | 多个 capture 同时运行耗尽连接 | 限制同时运行的 capture 数量（如 3 个） | > 5 个并发 capture |
+| **不限制消息长度** | 长消息导致 API 超时 | 消息长度限制（如 2048 字符），超出截断或分多条 | 消息 > 4KB |
 
 ---
 
@@ -327,11 +400,10 @@ Domain-specific security issues beyond general web security.
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| **SMTP 密码硬编码** | 凭证泄露，邮件服务器被滥用 | 使用环境变量，参考 QQBot 配置模式 |
-| **.env 文件提交到 Git** | 凭证进入版本控制，公开后不可撤销 | `.gitignore` 包含 `.env`，使用 `.env.example` 模板 |
-| **飞书 App Secret 泄露** | 攻击者可调用 API 冒充机器人 | 使用环境变量 `CLAW_CRON_FEISHU_APP_SECRET` |
-| **日志中打印敏感信息** | 密码/token 出现在日志文件 | 日志脱敏，不打印完整密码/token |
-| **邮件内容未转义** | XSS 风险（如果邮件内容包含用户输入） | 使用 HTML 转义，或发送纯文本 |
+| **企业微信 Secret 明文存储** | 泄露后可伪造机器人发送消息 | 使用环境变量或加密存储（如 keyring） |
+| **open_id 直接暴露在日志** | 用户隐私泄露 | 日志脱敏（open_id 只显示前 8 位） |
+| **capture 流程无防重放** | 恶意用户重复 capture 消耗资源 | capture 成功后记录，短时间内拒绝重复 capture |
+| **WebSocket 连接无鉴权** | 任何人可连接获取 open_id | 验证连接来源（检查 IP 白名单或 token） |
 
 ---
 
@@ -341,11 +413,11 @@ Common user experience mistakes in this domain.
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| **`channels add` 不验证配置** | 配置错误导致通知失败，用户不知情 | 添加时发送测试消息验证配置 |
-| **`channels list` 不显示配置状态** | 用户不知道哪个通道配置正确 | 显示每个通道的配置验证状态（✅/❌） |
-| **发送失败无日志提示** | 用户不知道为什么收不到通知 | 记录失败原因到日志，提供排查建议 |
-| **飞书 open_id 获取困难** | 用户不知道如何获取自己的 open_id | 提供 WebSocket 捕获方式，用户发消息给机器人后自动获取 |
-| **邮件退信无提示** | 用户不知道邮箱地址无效 | 显示退信统计，提示用户更新邮箱地址 |
+| **capture 提示不明确** | 用户不知道下一步操作 | 分步指引 + 示例 + 进度反馈 |
+| **错误信息只有错误码** | 用户无法自行解决 | 错误码 + 可能原因 + 解决建议 |
+| **通道选择无状态显示** | 用户不知道哪些通道可用 | `channels list` 显示配置状态（✓ 已配置 / ○ 未配置） |
+| **capture 失败无重试** | 用户需重新执行整个流程 | 提供"重试"选项，保留之前输入的 alias |
+| **多通道操作混淆** | 用户在不同通道间重复操作 | 显示当前操作的通道类型（如 `[qqbot] Waiting...`） |
 
 ---
 
@@ -353,14 +425,12 @@ Common user experience mistakes in this domain.
 
 Things that appear complete but are missing critical pieces.
 
-- [ ] **Email 通道:** 能发送邮件，但未处理退信 — 验证永久失败 (5xx) 是否被记录并清理
-- [ ] **Email 通道:** 使用 SMTP，但未验证发件人身份 — 验证 SPF/DKIM 配置
-- [ ] **Feishu 通道:** 能调用 API，但未订阅事件 — 验证开发者后台 `im.message.receive_v1` 已订阅
-- [ ] **Feishu 通道:** Token 缓存实现，但无自动刷新 — 验证过期前 (buffer_seconds) 会自动刷新
-- [ ] **Feishu 通道:** 发送成功，但用户收不到 — 验证用户在应用可用范围内
-- [ ] **Multi-Channel:** 每个通道能工作，但错误处理不一致 — 验证所有通道返回统一的 `MessageResult`
-- [ ] **Multi-Channel:** 能发送通知，但无速率控制 — 验证批量发送时不会触发限流
-- [ ] **Security:** 代码无硬编码密码，但 `.env` 未忽略 — 验证 `.gitignore` 包含 `.env`
+- [ ] **企业微信通道：** 往往只实现 `send_text`，缺少 `send_markdown` 和降级逻辑 — 验证 markdown 失败时是否 fallback
+- [ ] **capture 流程：** 往往只实现 WebSocket 连接，缺少超时和重连 — 验证 5 分钟后是否自动退出
+- [ ] **token 刷新：** 往往只在启动时获取一次，缺少后台刷新 — 验证运行 2 小时后是否仍可用
+- [ ] **错误处理：** 往往只捕获异常，缺少错误码解析 — 验证频率限制时是否返回具体错误信息
+- [ ] **日志记录：** 往往只记录成功/失败，缺少上下文 — 验证日志是否包含 recipient、error_code、latency
+- [ ] **降级通道：** 往往只实现一个通道，缺少降级 — 验证企业微信失败时是否降级到 QQ Bot
 
 ---
 
@@ -370,12 +440,11 @@ When pitfalls occur despite prevention, how to recover.
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| **SMTP 凭证泄露** | HIGH | 1. 立即更改密码/App Password<br>2. 检查发送日志，确认无异常邮件<br>3. 启用 2FA（如未启用）<br>4. 从 Git 历史中移除敏感文件（使用 `git filter-branch`） |
-| **飞书 Token 过期导致批量失败** | LOW | 1. 触发 token 刷新<br>2. 重新发送失败的通知<br>3. 添加提前刷新机制防止再次发生 |
-| **飞书事件订阅未配置** | MEDIUM | 1. 开发者后台配置事件订阅<br>2. 发布新版本<br>3. 通知用户重新测试 |
-| **多通道错误处理不一致** | HIGH | 1. 定义统一的 `MessageResult` 接口<br>2. 重构每个通道的错误处理<br>3. 更新调度器的错误处理逻辑 |
-| **触发频率限制** | LOW | 1. 降低发送速率<br>2. 添加速率限制逻辑<br>3. 等待限流解除后重试 |
-| **无效邮箱累积** | MEDIUM | 1. 扫描退信记录，识别无效邮箱<br>2. 清理通知列表<br>3. 实现自动退信处理 |
+| **个人微信被封** | HIGH（无法恢复） | 1. 申诉解封（成功率低）<br>2. 注册新号，使用企业微信 |
+| **企业微信 token 失效** | LOW | 1. 重新运行 `channels add`<br>2. 检查网络和权限配置 |
+| **capture 超时失败** | LOW | 1. 检查网络（切换 Wi-Fi/热点）<br>2. 运行 `channels verify` 验证配置<br>3. 重试 capture |
+| **频率限制触发** | MEDIUM | 1. 等待 1 分钟后重试<br>2. 实现队列限流<br>3. 添加降级通道 |
+| **WebSocket 连接断开** | LOW | 1. 自动重连（已实现）<br>2. 用户无需操作 |
 
 ---
 
@@ -385,38 +454,25 @@ How roadmap phases should address these pitfalls.
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| SMTP 凭证明文存储 | Phase 1 (通道基础架构) | 检查 EmailConfig 使用环境变量，无硬编码 |
-| 忽略 SMTP 错误码区别 | Phase 2 (邮件通道实现) | 测试 4xx/5xx 错误码处理逻辑，验证退信记录 |
-| 飞书事件订阅未配置 | Phase 3 (飞书通道实现) | 验证开发者后台事件订阅配置 |
-| 飞书 Token 过期 | Phase 3 (飞书通道实现) | 测试 token 自动刷新，验证 buffer_seconds 逻辑 |
-| 飞书用户不在可用范围 | Phase 3 (飞书通道实现) | 测试不同用户场景，验证错误提示 |
-| 忽略频率限制 | Phase 2-3 (邮件和飞书) | 批量发送测试，验证无 230020/421 错误 |
-| 多通道错误处理不一致 | Phase 1 (通道基础架构) | 检查所有通道返回统一的 `MessageResult` |
-| `channels add` 不验证 | Phase 4 (交互改进) | 测试添加通道时发送测试消息 |
-| `channels list` 无状态 | Phase 4 (交互改进) | 验证显示配置状态（✅/❌） |
+| **个人微信封号风险** | Phase 14 (微信通道实现) | 只提供企业微信选项，文档明确警告个人微信风险 |
+| **企业微信群 vs 应用选择错误** | Phase 14 (微信通道实现) | 架构设计时选择应用机器人，不实现群机器人 |
+| **API 频率限制未处理** | Phase 14 (微信通道实现) | 实现完整的重试、熔断、降级逻辑，测试限流场景 |
+| **capture 用户不知道下一步** | Phase 15 (自动 capture 流程) | 用户测试：首次使用用户能否独立完成 capture |
+| **不同通道 capture 不一致** | Phase 15 (自动 capture 流程) | 统一模板，对比测试 3 个通道的 capture 流程 |
+| **网络超时导致 capture 失败** | Phase 15 (自动 capture 流程) | 模拟弱网环境测试，验证超时和重连机制 |
 
 ---
 
 ## Sources
 
-- **官方文档：**
-  - 飞书开放平台：通用错误码 - https://open.larkoffice.com/document/server-docs/api-call-guide/generic-error-code
-  - 飞书开放平台：发送消息 API - https://open.feishu.cn/document/server-docs/im-v1/message/create
-  - 飞书开放平台：机器人概述 - https://open.feishu.cn/document/client-docs/bot-v3/bot-overview
-  - SendGrid：SMTP Errors and Troubleshooting - https://www.twilio.com/docs/sendgrid/for-developers/sending-email/smtp-errors-and-troubleshooting
-
-- **实战经验：**
-  - 飞书机器人接入踩坑指南 - https://leapvale.com/blog/technique/feishu-bot-setup-guide/
-  - SMTP Retries and Deferrals - https://www.warmy.io/blog/smtp-retries-and-deferrals-understanding-email-delays-how-to-fix-them/
-  - GitGuardian：Remediating SMTP Credential leaks - https://www.gitguardian.com/remediation/smtp-credential
-
-- **项目参考：**
-  - QQBot 实现：`src/claw_cron/channels/qqbot.py`
-    - Token 管理：TokenInfo 类，提前刷新机制
-    - 错误处理：区分速率限制和认证错误
-    - 重试策略：指数退避，最多 3 次
-    - 配置模式：pydantic_settings + 环境变量前缀
+- **微信 API 超时与熔断降级：** https://blog.csdn.net/ling_76539446/article/details/156560331 (MEDIUM confidence - 实践经验总结)
+- **企业微信群机器人限制：** https://blog.csdn.net/2501_94198109/article/details/155856070 (HIGH confidence - 官方文档确认)
+- **Webhook 重试最佳实践：** https://dev.to/henry_hang/webhook-best-practices-retry-logic-idempotency-and-error-handling-27i3 (HIGH confidence - 行业标准)
+- **微信封号规则 2026：** https://www.zhanghaobang.cn/policy/wechat-ban-rules-2026 (MEDIUM confidence - 第三方总结，非官方)
+- **个人微信 vs 企业微信对比：** WebSearch 结果未验证（LOW confidence，建议查阅官方文档）
+- **现有实现参考：** `src/claw_cron/channels/qqbot.py` (HIGH confidence - 已验证代码)
 
 ---
-*Pitfalls research for: 邮件和飞书通知通道集成*
+
+*Pitfalls research for: 微信通道 & Capture 增强*  
 *Researched: 2026-04-17*

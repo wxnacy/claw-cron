@@ -1,842 +1,564 @@
-# Architecture Research: Email & Feishu Channels
+# Architecture Research: 微信通道 & Capture 增强
 
-**Domain:** Message channel integration for claw-cron
+**Domain:** Message Channel Extension
 **Researched:** 2026-04-17
 **Confidence:** HIGH
 
-## Integration Overview
+## 现有架构分析
+
+### 系统概览
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     claw-cron Notification                       │
+│                          CLI Layer                               │
+│  claw-cron channels [add|list|delete|capture|verify]             │
 ├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │
-│  │ Notifier │  │  Notify  │  │ Contact  │  │    Config    │    │
-│  │          │  │  Config  │  │ Resolver │  │   Loader     │    │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘    │
-│       │             │             │                │            │
-├───────┴─────────────┴─────────────┴────────────────┴────────────┤
-│                    Channel Registry Layer                        │
+│                      Command Layer                               │
+│  src/claw_cron/cmd/channels.py                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ add()        │  │ capture()    │  │ verify()     │           │
+│  └──────┬───────┘  └──────┬───────┘  └──────────────┘           │
+│         │                 │                                      │
+├─────────┴─────────────────┴──────────────────────────────────────┤
+│                     Channel Abstraction                          │
+│  src/claw_cron/channels/                                         │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ MessageChannel (ABC)                                     │   │
+│  │  - channel_id: str                                       │   │
+│  │  - send_text(recipient, content) → MessageResult         │   │
+│  │  - send_markdown(recipient, content) → MessageResult     │   │
+│  │  - health_check() → bool                                 │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│         ↑             ↑             ↑             ↑             │
+│  ┌──────┴──────┐ ┌────┴─────┐ ┌─────┴──────┐ ┌────┴─────┐       │
+│  │ IMessage    │ │ QQBot    │ │ Feishu     │ │ Email    │       │
+│  │ Channel     │ │ Channel  │ │ Channel    │ │ Channel  │       │
+│  └─────────────┘ └──────────┘ └────────────┘ └──────────┘       │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ CHANNEL_REGISTRY: dict[str, type[MessageChannel]]        │   │
+│  │ get_channel(channel_id) → MessageChannel instance        │   │
+│  │ get_channel_status(channel_id) → (icon, text)           │   │
+│  └──────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────┤
-│  CHANNEL_REGISTRY = {                                            │
-│    "imessage": IMessageChannel,                                  │
-│    "qqbot": QQBotChannel,                                        │
-│    "email": EmailChannel,         ← NEW                          │
-│    "feishu": FeishuChannel        ← NEW                          │
-│  }                                                               │
+│                     Configuration Layer                          │
+│  ~/.config/claw-cron/config.yaml                                 │
+│  channels:                                                       │
+│    qqbot: { app_id, client_secret, enabled, created_at }        │
+│    feishu: { app_id, app_secret, enabled, created_at }          │
+│    wechat: { corp_id, agent_id, secret, enabled, created_at }   │
 ├─────────────────────────────────────────────────────────────────┤
-│              MessageChannel Abstract Interface                   │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐            │
-│  │ IMessageCh  │  │ QQBotChannel │  │ EmailChannel │ ← NEW      │
-│  └─────────────┘  └──────────────┘  └──────────────┘            │
-│  ┌──────────────┐                                                │
-│  │ FeishuChannel│ ← NEW                                          │
-│  └──────────────┘                                                │
+│                        Storage Layer                             │
+│  ~/.config/claw-cron/contacts.yaml                               │
+│  contacts:                                                       │
+│    me: { openid, channel, alias, created }                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Existing Architecture Components
+### 组件职责
 
-| Component | Responsibility | Integration Point |
-|-----------|----------------|-------------------|
-| **MessageChannel** | Abstract base class defining channel interface | EmailChannel & FeishuChannel inherit from this |
-| **ChannelConfig** | Base configuration dataclass | EmailConfig & FeishuConfig extend this |
-| **MessageResult** | Standardized send result | Used by all channels |
-| **CHANNEL_REGISTRY** | Channel class registry | Register new channels here |
-| **get_channel()** | Factory function | No changes needed - works automatically |
-| **Notifier** | Orchestrates notification sending | No changes needed - works with any registered channel |
-| **NotifyConfig** | Task-level notification config | No changes needed |
-| **Contact** | Recipient alias management | Works with email addresses & open_ids |
-| **channels CLI** | Channel management commands | Add support for "email" and "feishu" types |
+| 组件 | 职责 | 实现方式 |
+|------|------|----------|
+| `MessageChannel` | 通道抽象接口，定义统一发送 API | ABC + @abstractmethod |
+| `CHANNEL_REGISTRY` | 通道注册表，支持动态发现 | dict[channel_id, channel_class] |
+| `get_channel()` | 通道工厂函数 | 根据 channel_id 实例化通道 |
+| `get_channel_status()` | 配置状态检查 | 读取 config.yaml，验证必填字段 |
+| `channels.py` | CLI 命令组 | Click + InquirerPy 交互 |
+| `prompt_channel_select()` | 通道选择交互 | 从 CHANNEL_REGISTRY 构建选项列表 |
 
-## New Components Required
+## 1. WechatChannel 实现要点
 
-### 1. EmailChannel
+### 1.1 继承 MessageChannel 的方法
 
-**File:** `src/claw_cron/channels/email.py`
-
+**必须实现:**
 ```python
-"""Email channel implementation using aiosmtplib."""
-
-from dataclasses import dataclass
-from email.message import EmailMessage
-from typing import Any
-
-import aiosmtplib
-from pydantic import Field
-from pydantic_settings import BaseSettings
-
-from .base import ChannelConfig, MessageChannel, MessageResult
-from .exceptions import ChannelConfigError, ChannelSendError
-
-
-@dataclass
-class EmailConfig(BaseSettings, ChannelConfig):
-    """Email channel configuration.
-    
-    Environment variables use CLAW_CRON_EMAIL_ prefix:
-        - CLAW_CRON_EMAIL_SMTP_HOST: SMTP server hostname
-        - CLAW_CRON_EMAIL_SMTP_PORT: SMTP server port
-        - CLAW_CRON_EMAIL_USERNAME: SMTP username
-        - CLAW_CRON_EMAIL_PASSWORD: SMTP password
-        - CLAW_CRON_EMAIL_FROM: From email address
-        - CLAW_CRON_EMAIL_USE_TLS: Use TLS (default: True)
-    
-    Attributes:
-        smtp_host: SMTP server hostname.
-        smtp_port: SMTP server port (default: 587).
-        username: SMTP authentication username.
-        password: SMTP authentication password.
-        from_email: Default sender email address.
-        use_tls: Whether to use TLS encryption.
-    """
-    
-    smtp_host: str | None = Field(default=None, description="SMTP server hostname")
-    smtp_port: int = Field(default=587, description="SMTP server port")
-    username: str | None = Field(default=None, description="SMTP username")
-    password: str | None = Field(default=None, description="SMTP password")
-    from_email: str | None = Field(default=None, description="Sender email address")
-    use_tls: bool = Field(default=True, description="Use TLS encryption")
-    
-    class Config:
-        env_prefix = "CLAW_CRON_EMAIL_"
-        env_file = ".env"
-        extra = "ignore"
-
-
-class EmailChannel(MessageChannel):
-    """Email channel using aiosmtplib.
-    
-    This channel sends emails via SMTP. Supports:
-    - Plain text and HTML messages
-    - TLS/SSL encryption
-    - Multiple recipients
-    
-    Recipient format: email address string (e.g., "user@example.com")
-    
-    Example:
-        >>> from claw_cron.channels import get_channel
-        >>> channel = get_channel("email")
-        >>> result = await channel.send_text("user@example.com", "Hello!")
-    """
-    
-    def __init__(self, config: EmailConfig | dict | None = None) -> None:
-        """Initialize email channel.
-        
-        Args:
-            config: Email configuration. Can be EmailConfig, dict, or None.
-        """
-        if config is None:
-            config_obj = EmailConfig()
-        elif isinstance(config, dict):
-            config_obj = EmailConfig(**config)
-        else:
-            config_obj = config
-        super().__init__(config_obj)
-    
+class WechatChannel(MessageChannel):
     @property
     def channel_id(self) -> str:
-        """Return unique channel identifier."""
-        return "email"
-    
-    def _validate_config(self) -> None:
-        """Validate configuration has required fields."""
-        if not self.config.smtp_host:
-            raise ChannelConfigError(
-                "Email smtp_host is required. Set CLAW_CRON_EMAIL_SMTP_HOST environment variable.",
-                channel_id=self.channel_id,
-            )
-        if not self.config.from_email:
-            raise ChannelConfigError(
-                "Email from_email is required. Set CLAW_CRON_EMAIL_FROM environment variable.",
-                channel_id=self.channel_id,
-            )
-    
+        return "wechat"
+
     async def send_text(self, recipient: str, content: str) -> MessageResult:
-        """Send a plain text email.
-        
-        Args:
-            recipient: Recipient email address.
-            content: Plain text email content.
-        
-        Returns:
-            MessageResult indicating success or failure.
-        """
-        self._validate_config()
-        
-        message = EmailMessage()
-        message["From"] = self.config.from_email
-        message["To"] = recipient
-        message["Subject"] = "claw-cron notification"
-        message.set_content(content)
-        
-        try:
-            await aiosmtplib.send(
-                message,
-                hostname=self.config.smtp_host,
-                port=self.config.smtp_port,
-                username=self.config.username,
-                password=self.config.password,
-                start_tls=self.config.use_tls,
-            )
-            return MessageResult(success=True)
-        except Exception as e:
-            return MessageResult(success=False, error=str(e))
-    
+        # 企业微信消息发送 API
+        pass
+
     async def send_markdown(self, recipient: str, content: str) -> MessageResult:
-        """Send an HTML email (markdown converted to HTML).
-        
-        Note: For simplicity, sends as plain text.
-        Future enhancement: Use markdown library to convert to HTML.
-        
-        Args:
-            recipient: Recipient email address.
-            content: Markdown content (sent as plain text for now).
-        
-        Returns:
-            MessageResult indicating success or failure.
-        """
-        # For MVP, treat markdown as plain text
-        return await self.send_text(recipient, content)
+        # 企业微信支持 markdown，直接发送
+        pass
 ```
 
-**Key Design Decisions:**
-- Uses `aiosmtplib` for async SMTP (version 5.1.0+)
-- Follows QQBotChannel pattern for configuration
-- Recipients are email addresses (no special format needed)
-- Supports TLS by default (port 587 + STARTTLS)
-- MVP: markdown sent as plain text (future: convert to HTML)
-
-### 2. FeishuChannel
-
-**File:** `src/claw_cron/channels/feishu.py`
-
+**可选实现:**
 ```python
-"""Feishu (Lark) channel implementation."""
+    async def health_check(self) -> bool:
+        # 验证 access_token 是否有效
+        pass
+```
 
-import time
-from dataclasses import dataclass
-from typing import Any
+### 1.2 新增配置项
 
-import httpx
-from pydantic import Field
-from pydantic_settings import BaseSettings
-from tenacity import retry, stop_after_attempt, wait_exponential
+**WechatConfig (企业微信应用):**
+```python
+class WechatConfig(BaseSettings, ChannelConfig):
+    corp_id: str | None = Field(
+        default=None,
+        description="企业 ID from work.weixin.qq.com"
+    )
+    agent_id: str | None = Field(
+        default=None,
+        description="应用 AgentId"
+    )
+    secret: str | None = Field(
+        default=None,
+        description="应用 Secret"
+    )
 
-from .base import ChannelConfig, MessageChannel, MessageResult
-from .exceptions import ChannelAuthError, ChannelConfigError, ChannelSendError
+    class Config:
+        env_prefix = "CLAW_CRON_WECHAT_"
+```
 
+**config.yaml 结构:**
+```yaml
+channels:
+  wechat:
+    corp_id: "ww1234567890abcdef"
+    agent_id: "1000001"
+    secret: "abc123..."
+    enabled: true
+    created_at: "2026-04-17T10:00:00"
+```
 
+### 1.3 Recipient 格式
+
+**企业微信用户标识:**
+- `touser`: 成员 UserID（企业通讯录中的账号）
+- 格式: 直接使用 UserID，如 `"wxnacy"`
+- 或使用别名: `"c2c:wxnacy"` (与其他通道保持一致)
+
+**与 QQ/Feishu 的差异:**
+| 通道 | 用户标识 | 来源 |
+|------|---------|------|
+| QQ Bot | openid (bot-specific) | 需 WebSocket 捕获 |
+| Feishu | open_id (bot-specific) | 需 WebSocket 捕获 |
+| Wechat | UserID (企业通讯录) | **已知，无需捕获** |
+
+**关键差异:** 企业微信不需要 capture 流程！UserID 在企业通讯录中已知。
+
+### 1.4 Token 管理
+
+**企业微信 access_token:**
+```python
 @dataclass
-class TokenInfo:
-    """Cached tenant access token."""
+class WechatTokenInfo:
     access_token: str
-    expires_at: float
-    buffer_seconds: int = 60
-    
-    def is_expired(self) -> bool:
-        """Check if token needs refresh."""
-        return time.time() >= (self.expires_at - self.buffer_seconds)
+    expires_at: float  # 7200s 有效期
 
-
-class FeishuConfig(BaseSettings, ChannelConfig):
-    """Feishu channel configuration.
-    
-    Environment variables use CLAW_CRON_FEISHU_ prefix:
-        - CLAW_CRON_FEISHU_APP_ID: Feishu App ID
-        - CLAW_CRON_FEISHU_APP_SECRET: Feishu App Secret
-    
-    Attributes:
-        app_id: Feishu application App ID.
-        app_secret: Feishu application App Secret.
-    """
-    
-    app_id: str | None = Field(default=None, description="Feishu App ID")
-    app_secret: str | None = Field(default=None, description="Feishu App Secret")
-    
-    class Config:
-        env_prefix = "CLAW_CRON_FEISHU_"
-        env_file = ".env"
-        extra = "ignore"
-
-
-class FeishuChannel(MessageChannel):
-    """Feishu (Lark) channel for private messages.
-    
-    This channel sends private messages via Feishu Bot API.
-    Similar to QQBotChannel, requires app credentials and tenant_access_token.
-    
-    Recipient format: User open_id (e.g., "ou_7d8a6e6df7621556ce0d21922b676706ccs")
-    
-    Prerequisites:
-        - Application with bot capability enabled
-        - User must be in bot's available scope
-        - User's open_id obtained via API or events
-    
-    Example:
-        >>> from claw_cron.channels import get_channel
-        >>> channel = get_channel("feishu")
-        >>> result = await channel.send_text("ou_xxx", "Hello!")
-    """
-    
-    API_BASE = "https://open.feishu.cn/open-apis"
-    
-    def __init__(self, config: FeishuConfig | dict | None = None) -> None:
-        """Initialize Feishu channel."""
-        if config is None:
-            config_obj = FeishuConfig()
-        elif isinstance(config, dict):
-            config_obj = FeishuConfig(**config)
-        else:
-            config_obj = config
-        super().__init__(config_obj)
-        self._token: TokenInfo | None = None
-        self._http_client = httpx.AsyncClient(timeout=30.0)
-    
-    @property
-    def channel_id(self) -> str:
-        """Return unique channel identifier."""
-        return "feishu"
-    
-    def _validate_config(self) -> None:
-        """Validate configuration."""
-        if not self.config.app_id:
-            raise ChannelConfigError(
-                "Feishu app_id is required. Set CLAW_CRON_FEISHU_APP_ID environment variable.",
-                channel_id=self.channel_id,
-            )
-        if not self.config.app_secret:
-            raise ChannelConfigError(
-                "Feishu app_secret is required. Set CLAW_CRON_FEISHU_APP_SECRET environment variable.",
-                channel_id=self.channel_id,
-            )
-    
-    async def _get_tenant_access_token(self) -> str:
-        """Get valid tenant access token, refreshing if necessary."""
-        self._validate_config()
-        
-        if self._token and not self._token.is_expired():
-            return self._token.access_token
-        
-        try:
-            response = await self._http_client.post(
-                f"{self.API_BASE}/auth/v3/tenant_access_token/internal",
-                json={
-                    "app_id": self.config.app_id,
-                    "app_secret": self.config.app_secret,
-                },
-            )
-            data = response.json()
-            
-            if data.get("code", 0) != 0:
-                raise ChannelAuthError(
-                    f"Feishu authentication failed: {data.get('msg', 'Unknown error')}",
-                    channel_id=self.channel_id,
-                )
-            
-            self._token = TokenInfo(
-                access_token=data["tenant_access_token"],
-                expires_at=time.time() + int(data.get("expire", 7200)),
-            )
-            return self._token.access_token
-        
-        except httpx.HTTPStatusError as e:
-            raise ChannelAuthError(
-                f"Feishu authentication failed: HTTP {e.response.status_code}",
-                channel_id=self.channel_id,
-            ) from e
-    
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-    async def _send_message(
-        self,
-        receive_id: str,
-        msg_type: str,
-        content: str,
-    ) -> dict[str, Any]:
-        """Send message to Feishu API with retry."""
-        token = await self._get_tenant_access_token()
-        
-        try:
-            response = await self._http_client.post(
-                f"{self.API_BASE}/im/v1/messages",
-                params={"receive_id_type": "open_id"},
-                headers={"Authorization": f"Bearer {token}"},
-                json={
-                    "receive_id": receive_id,
-                    "msg_type": msg_type,
-                    "content": content,
-                },
-            )
-            
-            data = response.json()
-            
-            if data.get("code", 0) != 0:
-                raise ChannelSendError(
-                    f"Feishu send failed: [{data.get('code')}] {data.get('msg')}",
-                    channel_id=self.channel_id,
-                )
-            
-            return data
-        
-        except httpx.RequestError as e:
-            raise ChannelSendError(
-                f"Feishu send failed: {e}",
-                channel_id=self.channel_id,
-            ) from e
-    
-    async def send_text(self, recipient: str, content: str) -> MessageResult:
-        """Send plain text message.
-        
-        Args:
-            recipient: User open_id (e.g., "ou_xxx").
-            content: Plain text content.
-        
-        Returns:
-            MessageResult indicating success or failure.
-        """
-        import json
-        
-        try:
-            data = await self._send_message(
-                receive_id=recipient,
-                msg_type="text",
-                content=json.dumps({"text": content}),
-            )
-            return MessageResult(
-                success=True,
-                message_id=data.get("data", {}).get("message_id"),
-                raw_response=data,
-            )
-        except (ChannelAuthError, ChannelSendError) as e:
-            return MessageResult(success=False, error=str(e))
-    
-    async def send_markdown(self, recipient: str, content: str) -> MessageResult:
-        """Send markdown-formatted message.
-        
-        Args:
-            recipient: User open_id.
-            content: Markdown content.
-        
-        Returns:
-            MessageResult indicating success or failure.
-        """
-        import json
-        
-        # Feishu supports markdown in "post" message type
-        # For simplicity, send as text (supports markdown rendering in Feishu)
-        return await self.send_text(recipient, content)
-    
-    async def close(self) -> None:
-        """Close HTTP client."""
-        await self._http_client.aclose()
+async def _get_access_token(self) -> str:
+    # 缓存逻辑类似 QQBot
+    # API: https://qyapi.weixin.qq.com/cgi-bin/gettoken
+    #      ?corpid=CORPID&corpsecret=SECRET
+    pass
 ```
 
-**Key Design Decisions:**
-- Uses official Feishu API (not webhook) for private messages
-- Mirrors QQBotChannel architecture (token management, retry logic)
-- Recipients are `open_id` strings (similar to QQ Bot)
-- Uses `tenant_access_token` for authentication
-- Rate limit: 5 QPS per user (same as QQ Bot)
-- Supports markdown via text messages (Feishu renders markdown automatically)
+### 1.5 消息发送 API
 
-### 3. Registry Updates
+**企业微信发送消息:**
+```python
+async def send_text(self, recipient: str, content: str) -> MessageResult:
+    token = await self._get_access_token()
+    # API: https://qyapi.weixin.qq.com/cgi-bin/message/send
+    payload = {
+        "touser": recipient,
+        "msgtype": "text",
+        "agentid": self.config.agent_id,
+        "text": {"content": content}
+    }
+    # POST with access_token parameter
+    pass
+```
 
-**File:** `src/claw_cron/channels/__init__.py` (MODIFY)
+## 2. Capture 交互改进
+
+### 2.1 现有 Capture 流程分析
+
+**QQ Bot Capture:**
+```
+channels capture --channel-type qqbot --alias me
+    ↓
+WebSocket 连接 → 等待用户发消息 → 提取 openid → 保存为 Contact
+```
+
+**Feishu Capture:**
+```
+channels capture --channel-type feishu --alias me
+    ↓
+lark.ws.Client → 等待用户发消息 → 提取 open_id → 保存为 Contact
+```
+
+**iMessage/Email:** 无需 capture (已知标识)
+
+### 2.2 统一不同通道的 Capture 流程
+
+**方案 A: 通道声明 capture 能力 (推荐)**
 
 ```python
-# ... existing imports ...
+class MessageChannel(ABC):
+    @property
+    def supports_capture(self) -> bool:
+        """通道是否支持 capture 流程"""
+        return False
 
-# Import and register built-in channels
-from .email import EmailChannel
-from .feishu import FeishuChannel
-from .imessage import IMessageChannel
-from .qqbot import QQBotChannel
-
-CHANNEL_REGISTRY["email"] = EmailChannel      # ← NEW
-CHANNEL_REGISTRY["feishu"] = FeishuChannel    # ← NEW
-CHANNEL_REGISTRY["imessage"] = IMessageChannel
-CHANNEL_REGISTRY["qqbot"] = QQBotChannel
-
-__all__ = [
-    # ... existing exports ...
-    "EmailChannel",     # ← NEW
-    "FeishuChannel",    # ← NEW
-]
+    async def capture_openid(self, alias: str) -> str | None:
+        """捕获用户 openid (仅支持 capture 的通道实现)"""
+        raise NotImplementedError(
+            f"{self.channel_id} does not support capture"
+        )
 ```
 
-### 4. CLI Updates
+**实现示例:**
+```python
+class QQBotChannel(MessageChannel):
+    @property
+    def supports_capture(self) -> bool:
+        return True
 
-**File:** `src/claw_cron/cmd/channels.py` (MODIFY)
+    async def capture_openid(self, alias: str) -> str | None:
+        # WebSocket capture 逻辑
+        pass
 
-#### Changes to `add` command:
+class IMessageChannel(MessageChannel):
+    @property
+    def supports_capture(self) -> bool:
+        return False  # iMessage 使用电话号码/邮箱，无需 capture
+
+class WechatChannel(MessageChannel):
+    @property
+    def supports_capture(self) -> bool:
+        return False  # 企业微信使用已知 UserID，无需 capture
+```
+
+**capture 命令改进:**
+```python
+@channels.command()
+@click.option("--channel-type", type=click.Choice(["qqbot", "feishu"]))
+@click.option("--alias", default="me")
+def capture(channel_type: str, alias: str) -> None:
+    channel = get_channel(channel_type)
+
+    if not channel.supports_capture:
+        console.print(f"[yellow]{channel_type} 不需要 capture 流程[/yellow]")
+        console.print(f"[dim]直接使用已知标识符发送消息[/dim]")
+        return
+
+    openid = await channel.capture_openid(alias)
+    if openid:
+        save_contact(Contact(openid=openid, channel=channel_type, alias=alias))
+```
+
+### 2.3 验证后自动触发 Capture
+
+**当前 add 命令流程:**
+```python
+@channels.command()
+@click.option("--capture-openid", is_flag=True)
+def add(capture_openid: bool) -> None:
+    # 1. 选择通道类型
+    # 2. 输入凭证
+    # 3. 验证凭证
+    # 4. 保存配置
+    if capture_openid:
+        # 手动触发 capture
+        asyncio.run(_capture_qqbot_openid(alias="me"))
+```
+
+**改进方案:**
+
+**方案 B: 验证成功后自动询问 (推荐)**
 
 ```python
 @channels.command()
-@click.option(
-    "--channel-type",
-    type=click.Choice(["qqbot", "email", "feishu"], case_sensitive=False),  # ← UPDATED
-    prompt="Channel type",
-    help="Type of channel to configure",
-)
-@click.option("--app-id", help="App ID (for qqbot/feishu)")
-@click.option("--client-secret", help="Client Secret (for qqbot)")
-@click.option("--app-secret", help="App Secret (for feishu)")
-@click.option("--smtp-host", help="SMTP server hostname (for email)")
-@click.option("--smtp-port", type=int, default=587, help="SMTP port (default: 587)")
-@click.option("--username", help="SMTP username (for email)")
-@click.option("--password", help="SMTP password (for email)")
-@click.option("--from-email", help="Sender email address (for email)")
-def add(
-    channel_type: str,
-    app_id: str | None,
-    client_secret: str | None,
-    app_secret: str | None,
-    smtp_host: str | None,
-    smtp_port: int,
-    username: str | None,
-    password: str | None,
-    from_email: str | None,
-) -> None:
-    """Add a new message channel configuration."""
-    channel_type = channel_type.lower()
-    
-    if channel_type == "email":
-        # Interactive prompts for email
-        if not smtp_host:
-            smtp_host = click.prompt("SMTP server hostname")
-        if not username:
-            username = click.prompt("SMTP username")
-        if not password:
-            password = click.prompt("SMTP password", hide_input=True)
-        if not from_email:
-            from_email = click.prompt("Sender email address")
-        
-        # Validate connection (optional but recommended)
-        # ... validation logic ...
-        
-        config["channels"]["email"] = {
-            "smtp_host": smtp_host,
-            "smtp_port": smtp_port,
-            "username": username,
-            "password": password,
-            "from_email": from_email,
-            "use_tls": True,
-            "enabled": True,
-        }
-    
-    elif channel_type == "feishu":
-        # Interactive prompts for feishu
-        if not app_id:
-            app_id = click.prompt("Feishu App ID")
-        if not app_secret:
-            app_secret = click.prompt("Feishu App Secret", hide_input=True)
-        
-        # Validate credentials
-        # ... validation logic ...
-        
-        config["channels"]["feishu"] = {
-            "app_id": app_id,
-            "app_secret": app_secret,
-            "enabled": True,
-        }
-    
-    # ... existing qqbot logic ...
+@click.option("--capture-openid", is_flag=True, default=None)
+def add(capture_openid: bool | None) -> None:
+    # ... 验证凭证并保存 ...
+
+    # 检查通道是否需要 capture
+    channel = get_channel(channel_type)
+
+    if channel.supports_capture:
+        if capture_openid is None:
+            # 未指定 --capture-openid，询问用户
+            do_capture = prompt_confirm(
+                "是否立即获取用户 OpenID?",
+                default=True
+            )
+        else:
+            do_capture = capture_openid
+
+        if do_capture:
+            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
+            asyncio.run(_capture_openid(channel_type, alias="me"))
+    else:
+        console.print(f"[dim]{channel_type} 无需 capture，直接使用已知标识符[/dim]")
 ```
 
-#### Changes to `list` command:
+**优化点:**
+1. 自动判断是否需要 capture (`channel.supports_capture`)
+2. 未指定 flag 时询问用户，而非强制手动指定
+3. 不支持 capture 的通道给出友好提示
+
+### 2.4 Capture 实现统一接口
+
+**重构 capture 实现:**
 
 ```python
-@channels.command("list")
-def list_channels() -> None:
-    """List configured message channels."""
+async def _capture_openid(channel_type: str, alias: str) -> None:
+    """统一的 capture 入口"""
     config = load_config()
-    channels_config = config.get("channels", {})
+    channel_config = config.get("channels", {}).get(channel_type, {})
 
-    if not channels_config:
-        console.print("[dim]No channels configured.[/dim]")
-        return
+    channel = get_channel(channel_type, config=channel_config)
 
-    table = Table(title="Configured Channels")
-    table.add_column("Channel", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Config", style="dim")
-    table.add_column("Contacts", style="yellow")
-
-    contacts_data = load_contacts()
-
-    for channel_id, cfg in channels_config.items():
-        status = "[green]enabled[/green]" if cfg.get("enabled", True) else "[red]disabled[/red]"
-        
-        # Display relevant config for each channel type
-        if channel_id == "email":
-            config_display = cfg.get("from_email", "N/A")
-        elif channel_id in ("qqbot", "feishu"):
-            app_id = cfg.get("app_id", "N/A")
-            config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id)
-        else:
-            config_display = "N/A"
-        
-        contact_count = sum(1 for c in contacts_data.values() if c.channel == channel_id)
-        table.add_row(channel_id, status, config_display, str(contact_count))
-
-    console.print(table)
+    try:
+        openid = await channel.capture_openid(alias)
+        if openid:
+            contact = Contact(
+                openid=openid,
+                channel=channel_type,
+                alias=alias,
+                created=datetime.now().isoformat(),
+            )
+            save_contact(contact)
+            console.print(f"[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
+    except NotImplementedError:
+        console.print(f"[yellow]{channel_type} 不支持 capture[/yellow]")
+    except Exception as e:
+        console.print(f"[red]Capture failed: {e}[/red]")
+        raise SystemExit(1)
 ```
 
-## Data Flow
+**通道特定实现移入 Channel 类:**
+```python
+class QQBotChannel(MessageChannel):
+    async def capture_openid(self, alias: str) -> str | None:
+        # 原 _capture_qqbot_openid 逻辑
+        # WebSocket 连接 → 等待消息 → 返回 openid
+        pass
 
-### Notification Sending Flow
-
-```
-Task Execution Complete
-    ↓
-Notifier.notify_task_result(task, exit_code, output)
-    ↓
-Load task.notify config (NotifyConfig)
-    ├── channel: "email" | "feishu" | "qqbot" | "imessage"
-    └── recipients: ["user@example.com"] | ["ou_xxx"] | ["c2c:xxx"]
-    ↓
-Load channel config from config.yaml
-    config["channels"][channel]
-    ↓
-get_channel(channel_id, config)
-    ↓
-CHANNEL_REGISTRY[channel_id](config) → Channel instance
-    ↓
-For each recipient:
-    ├── channel.send_text(recipient, message)
-    └── Returns MessageResult
-    ↓
-Return list[MessageResult]
+class FeishuChannel(MessageChannel):
+    async def capture_openid(self, alias: str) -> str | None:
+        # 原 _capture_feishu_openid 逻辑
+        # lark.ws.Client → 等待消息 → 返回 openid
+        pass
 ```
 
-### Channel Registration Flow
+## 3. 建议的实现顺序
+
+### Phase 1: 架构增强 (新建基础)
+
+**优先级:** 高 (为后续功能提供基础)
+
+**任务:**
+1. **MessageChannel 增加 capture 支持**
+   - 新增 `supports_capture` 属性
+   - 新增 `capture_openid()` 方法 (默认 raise NotImplementedError)
+
+2. **重构现有通道实现**
+   - QQBotChannel 实现 `capture_openid()`
+   - FeishuChannel 实现 `capture_openid()`
+   - IMessageChannel/EmailChannel 设置 `supports_capture = False`
+
+3. **统一 capture 命令逻辑**
+   - 提取 `_capture_openid()` 为通用入口
+   - 移除通道特定的 `_capture_qqbot_openid` / `_capture_feishu_openid`
+
+**文件修改:**
+- `src/claw_cron/channels/base.py` (新增属性和方法)
+- `src/claw_cron/channels/qqbot.py` (实现 capture_openid)
+- `src/claw_cron/channels/feishu.py` (实现 capture_openid)
+- `src/claw_cron/channels/imessage.py` (设置 supports_capture)
+- `src/claw_cron/channels/email.py` (设置 supports_capture)
+- `src/claw_cron/cmd/channels.py` (统一 capture 逻辑)
+
+**测试验证:**
+- 验证 `channels capture --channel-type qqbot` 仍然工作
+- 验证 `channels capture --channel-type feishu` 仍然工作
+
+### Phase 2: Capture 交互改进 (修改现有)
+
+**优先级:** 中 (UX 优化)
+
+**任务:**
+1. **add 命令增加自动询问逻辑**
+   - 验证成功后检查 `channel.supports_capture`
+   - 未指定 `--capture-openid` 时询问用户
+   - 不支持 capture 的通道给出提示
+
+2. **capture 命令增加友好提示**
+   - 对不支持 capture 的通道提示"无需 capture"
+   - 显示该通道应使用的标识符类型
+
+**文件修改:**
+- `src/claw_cron/cmd/channels.py` (add 和 capture 命令)
+
+**测试验证:**
+- 验证 `channels add` 后自动询问 capture
+- 验证 `channels capture --channel-type imessage` 提示无需 capture
+
+### Phase 3: WechatChannel 实现 (新建组件)
+
+**优先级:** 高 (核心功能)
+
+**任务:**
+1. **新建 wechat.py**
+   - 实现 `WechatConfig` 配置类
+   - 实现 `WechatChannel` 类
+   - 实现 token 管理 (类似 QQBot)
+   - 实现 `send_text()` 和 `send_markdown()`
+
+2. **注册通道**
+   - 在 `__init__.py` 中导入并注册
+   - 更新 `get_channel_status()` 增加 wechat 验证逻辑
+
+3. **add 命令增加 wechat 配置流程**
+   - 交互式输入 corp_id, agent_id, secret
+   - 验证凭证 (调用 gettoken API)
+   - 保存配置
+
+4. **verify 命令增加 wechat 验证**
+   - 验证 access_token 获取
+   - 显示企业信息
+
+**文件新建:**
+- `src/claw_cron/channels/wechat.py`
+
+**文件修改:**
+- `src/claw_cron/channels/__init__.py` (注册 wechat)
+- `src/claw_cron/cmd/channels.py` (add 和 verify 命令)
+
+**测试验证:**
+- 验证 `channels add` 能选择 wechat
+- 验证凭证验证正确
+- 验证 `channels verify wechat` 工作
+- 验证 `send_text()` 发送消息成功
+
+### Phase 4: 飞书 Capture 交互增强 (修改现有)
+
+**优先级:** 中 (需求要求)
+
+**任务:**
+1. **飞书 capture 交互式列表选择**
+   - 获取用户最近联系人列表
+   - InquirerPy 列表选择
+   - 保存选中的联系人
+
+**注意:** 飞书 API 是否支持获取联系人列表需要调研。
+
+**文件修改:**
+- `src/claw_cron/channels/feishu.py` (增加获取联系人方法)
+- `src/claw_cron/cmd/channels.py` (capture 命令增加交互)
+
+**测试验证:**
+- 验证飞书 capture 显示联系人列表
+- 验证选择后正确保存
+
+### Phase 5: 版本升级 (修改配置)
+
+**优先级:** 低 (收尾工作)
+
+**任务:**
+1. 更新 `pyproject.toml` 版本号到 0.2.1
+2. 更新 `PROJECT.md` 里程碑状态
+
+**文件修改:**
+- `pyproject.toml`
+- `.planning/PROJECT.md`
+
+## 依赖关系图
 
 ```
-channels add --channel-type email
+Phase 1 (架构增强)
     ↓
-Interactive prompts for config values
-    ↓
-Validate connection (optional)
-    ↓
-Save to ~/.config/claw-cron/config.yaml:
-    channels:
-        email:
-            smtp_host: smtp.example.com
-            smtp_port: 587
-            username: user@example.com
-            password: secret
-            from_email: user@example.com
-            use_tls: true
-            enabled: true
+    ├──→ Phase 2 (Capture 交互改进)
+    │        ↓
+    └──→ Phase 3 (WechatChannel 实现)
+             ↓
+         Phase 4 (飞书 Capture 增强)
+             ↓
+         Phase 5 (版本升级)
 ```
 
-## Configuration Schema
+**并行可能性:**
+- Phase 2 和 Phase 3 可以并行进行 (都依赖 Phase 1，但相互独立)
+- Phase 4 需要等待 Phase 3 完成 (可能复用交互逻辑)
+- Phase 5 最后执行
 
-### config.yaml Structure
+## 新建 vs 修改清单
 
-```yaml
-channels:
-  email:
-    smtp_host: smtp.gmail.com
-    smtp_port: 587
-    username: user@gmail.com
-    password: app_password
-    from_email: user@gmail.com
-    use_tls: true
-    enabled: true
-  
-  feishu:
-    app_id: cli_a1b2c3d4e5f6
-    app_secret: abc123def456
-    enabled: true
-  
-  qqbot:
-    app_id: 1234567890
-    client_secret: xyz789
-    enabled: true
-  
-  imessage:
-    enabled: true
+### 新建文件
 
-contacts:
-  me:
-    openid: ou_7d8a6e6df7621556ce0d21922b676706ccs
-    channel: feishu
-    alias: me
-    created: "2026-04-17T00:00:00"
-  
-  john:
-    openid: john@example.com
-    channel: email
-    alias: john
-    created: "2026-04-17T00:00:00"
-```
+| 文件 | 用途 | Phase |
+|------|------|-------|
+| `src/claw_cron/channels/wechat.py` | 企业微信通道实现 | Phase 3 |
 
-## Integration Points Summary
+### 修改文件
 
-| Component | Status | Changes Required |
-|-----------|--------|------------------|
-| **channels/base.py** | NO CHANGES | Abstract interface already supports new channels |
-| **channels/__init__.py** | MODIFY | Add imports & registry entries for EmailChannel, FeishuChannel |
-| **channels/email.py** | NEW FILE | Implement EmailChannel class |
-| **channels/feishu.py** | NEW FILE | Implement FeishuChannel class |
-| **notifier.py** | NO CHANGES | Works with any registered channel |
-| **contacts.py** | NO CHANGES | Works with email addresses & open_ids |
-| **cmd/channels.py** | MODIFY | Add email/feishu to add/delete/list commands |
-| **config.yaml** | MODIFY | Add email & feishu config sections |
+| 文件 | 修改内容 | Phase |
+|------|---------|-------|
+| `src/claw_cron/channels/base.py` | 新增 `supports_capture` 属性和 `capture_openid()` 方法 | Phase 1 |
+| `src/claw_cron/channels/qqbot.py` | 实现 `capture_openid()` | Phase 1 |
+| `src/claw_cron/channels/feishu.py` | 实现 `capture_openid()`，增强联系人获取 | Phase 1, 4 |
+| `src/claw_cron/channels/imessage.py` | 设置 `supports_capture = False` | Phase 1 |
+| `src/claw_cron/channels/email.py` | 设置 `supports_capture = False` | Phase 1 |
+| `src/claw_cron/channels/__init__.py` | 注册 wechat 通道 | Phase 3 |
+| `src/claw_cron/cmd/channels.py` | 统一 capture 逻辑，增加自动询问，增加 wechat 配置 | Phase 1, 2, 3 |
+| `pyproject.toml` | 版本号升级 | Phase 5 |
+| `.planning/PROJECT.md` | 更新里程碑状态 | Phase 5 |
 
-## Build Order
+## 关键决策点
 
-### Phase 1: EmailChannel (Simpler, Independent)
-1. Create `src/claw_cron/channels/email.py`
-   - EmailConfig dataclass
-   - EmailChannel class with send_text/send_markdown
-   - Error handling with ChannelConfigError, ChannelSendError
-2. Update `src/claw_cron/channels/__init__.py`
-   - Import EmailChannel
-   - Register in CHANNEL_REGISTRY
-   - Add to __all__
-3. Update `src/claw_cron/cmd/channels.py`
-   - Add "email" to channel-type choices
-   - Implement email-specific prompts in add command
-   - Update list command to show email config
-4. Add dependencies to pyproject.toml
-   - `aiosmtplib>=5.1.0`
-5. Test manually:
-   - `claw-cron channels add --channel-type email`
-   - Add task with email notification
-   - Verify email received
+### D-01: WechatChannel 是否需要 capture?
 
-### Phase 2: FeishuChannel (More Complex, Dependencies)
-1. Create `src/claw_cron/channels/feishu.py`
-   - FeishuConfig dataclass
-   - TokenInfo for token caching
-   - FeishuChannel with token management
-   - API integration with retry logic
-2. Update `src/claw_cron/channels/__init__.py`
-   - Import FeishuChannel
-   - Register in CHANNEL_REGISTRY
-   - Add to __all__
-3. Update `src/claw_cron/cmd/channels.py`
-   - Add "feishu" to channel-type choices
-   - Implement feishu-specific prompts
-   - Update list command
-4. Add to pyproject.toml (dependencies already present for QQBot)
-   - `httpx` (already exists)
-   - `tenacity` (already exists)
-   - `pydantic-settings` (already exists)
-5. Test manually:
-   - `claw-cron channels add --channel-type feishu`
-   - Obtain user open_id (manual API call or event)
-   - Add task with feishu notification
-   - Verify message received in Feishu
+**决策:** NO
 
-### Phase 3: Integration Testing
-1. Test multi-channel notification
-   - Task with multiple recipients across channels
-2. Test contact alias resolution
-   - `claw-cron channels contacts add --alias john --openid john@example.com --channel email`
-3. Test error handling
-   - Invalid credentials
-   - Network failures
-   - Rate limiting
+**原因:**
+- 企业微信使用企业通讯录中的 UserID
+- UserID 是已知标识，不需要通过消息捕获
+- 与 QQ/Feishu 的 bot-specific openid 机制不同
 
-## Dependencies
+**影响:**
+- `WechatChannel.supports_capture = False`
+- add 命令配置完成后提示"直接使用 UserID 发送消息"
 
-### Email Channel
-```toml
-[project.dependencies]
-aiosmtplib = ">=5.1.0"
-```
+### D-02: Capture 逻辑是否移入 Channel 类?
 
-### Feishu Channel
-```toml
-# Already present for QQBot
-httpx = ">=0.27.0"
-tenacity = ">=8.2.0"
-pydantic-settings = ">=2.0.0"
-```
+**决策:** YES (推荐)
 
-## Key Differences from Existing Channels
+**原因:**
+- 封装通道特定逻辑到对应类
+- 统一 capture 命令入口
+- 便于后续扩展新通道
 
-| Aspect | QQBotChannel | EmailChannel | FeishuChannel |
-|--------|--------------|--------------|---------------|
-| **Auth** | App ID + Client Secret | Username + Password | App ID + App Secret |
-| **Token** | access_token (2h) | No token | tenant_access_token (2h) |
-| **Recipient Format** | `c2c:OPENID` / `group:GROUP_ID` | Email address | `open_id` (ou_xxx) |
-| **API Base** | `api.sgroup.qq.com` | SMTP server | `open.feishu.cn` |
-| **Rate Limit** | 5 QPS/user | Server-dependent | 5 QPS/user |
-| **Markdown Support** | Yes (with fallback) | Via HTML (future) | Yes (auto-render) |
-| **Platform** | QQ | Any | Feishu/Lark |
-| **Get OpenID** | WebSocket event | N/A | API or event |
+**影响:**
+- 需要 Phase 1 架构重构
+- QQBotChannel 和 FeishuChannel 增加 `capture_openid()` 方法
 
-## Anti-Patterns to Avoid
+### D-03: 企业微信使用哪个 API?
 
-### Anti-Pattern 1: Synchronous SMTP
-**What people do:** Use Python's built-in `smtplib` which is synchronous
-**Why it's wrong:** Blocks the async event loop, affects scheduler performance
-**Do this instead:** Use `aiosmtplib` for fully async email sending
+**决策:** 企业微信应用消息 API (非机器人)
 
-### Anti-Pattern 2: Hardcoded Email Templates
-**What people do:** Hardcode email subject/body formatting in channel
-**Why it's wrong:** Notifier already formats messages, duplicates logic
-**Do this instead:** Use message from Notifier._format_message(), add subject configuration if needed
+**原因:**
+- 项目定位为"通知工具"，不需要机器人对话能力
+- 应用消息 API 更简单，支持全员推送
+- 与 QQ Bot/Feishu Bot 定位一致
 
-### Anti-Pattern 3: Feishu Webhook for Private Messages
-**What people do:** Use webhook approach (only works for group chats)
-**Why it's wrong:** Cannot send private messages via webhook
-**Do this instead:** Use tenant_access_token API with open_id for private messages
-
-### Anti-Pattern 4: Separate Token for Each Message
-**What people do:** Fetch new token for every send_text() call
-**Why it's wrong:** Wastes API calls, hits rate limits faster
-**Do this instead:** Cache token with expiration (like QQBotChannel), reuse until expired
-
-### Anti-Pattern 5: Ignoring Feishu OpenID Acquisition
-**What people do:** Assume open_id is easy to obtain
-**Why it's wrong:** Requires API calls or event subscriptions
-**Do this instead:** 
-- Document how to get open_id (API call with phone/email)
-- Consider adding `channels capture` command for Feishu (similar to QQBot)
-- Or provide utility command to lookup open_id by email
-
-## Security Considerations
-
-### Email Channel
-- **Password Storage:** Stored in plain text in config.yaml (same as QQBot)
-  - Mitigation: Recommend using app-specific passwords (Gmail, Outlook)
-  - Future: Consider keyring integration
-- **TLS:** Enabled by default, prevents MITM attacks
-- **From Address:** Must match SMTP account to avoid SPF/DKIM issues
-
-### Feishu Channel
-- **App Secret:** Same security model as QQBot (stored in config.yaml)
-- **Tenant Token:** 2-hour expiration limits exposure if leaked
-- **User Scope:** Only users in bot's available scope can receive messages
-- **OpenID Privacy:** OpenIDs are bot-specific, not globally unique
-
-## Scalability Considerations
-
-| Scale | Email Channel | Feishu Channel |
-|-------|---------------|----------------|
-| **10 notifications/day** | No issues | No issues |
-| **100 notifications/day** | No issues | No issues |
-| **1000+ notifications/day** | Check SMTP limits | Check Feishu quotas (contact support) |
-
-**Rate Limits:**
-- Email: Depends on SMTP provider (Gmail: 500/day, Outlook: 10000/day)
-- Feishu: 5 QPS per user, can request increase
+**API 端点:**
+- 获取 token: `https://qyapi.weixin.qq.com/cgi-bin/gettoken`
+- 发送消息: `https://qyapi.weixin.qq.com/cgi-bin/message/send`
 
 ## Sources
 
-- **aiosmtplib Documentation:** https://aiosmtplib.readthedocs.io/ (HIGH confidence)
-- **Feishu Message API:** https://open.feishu.cn/document/server-docs/im-v1/message/create (HIGH confidence - official docs)
-- **Feishu Authentication:** https://open.feishu.cn/document/server-docs/authentication-management/access-token/tenant_access_token (HIGH confidence - official docs)
-- **Feishu OpenID Guide:** https://open.larksuite.com/document/faq/trouble-shooting/how-to-obtain-openid (HIGH confidence - official docs)
-- **Python EmailMessage:** https://docs.pythonlang.cn/3/library/email.message.html (HIGH confidence - official docs)
-- **Existing QQBotChannel Implementation:** src/claw_cron/channels/qqbot.py (HIGH confidence - project code)
+- 企业微信 API 文档: https://developer.work.weixin.qq.com/document/path/90236
+- QQ Bot API 文档: https://bot.q.qq.com/wiki/develop/api/
+- 飞书开放平台: https://open.feishu.cn/document/client-docs/bot-v3/events
 
 ---
-*Architecture research for: Email & Feishu channel integration*
+*Architecture research for: 微信通道 & Capture 增强*
 *Researched: 2026-04-17*
