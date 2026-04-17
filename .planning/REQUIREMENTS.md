@@ -17,7 +17,7 @@
 ### Context Feedback (script → 系统)
 
 - [ ] **CTX-05**: JSON stdout 解析 — 解析 command 任务 stdout 中的 JSON 对象，提取为上下文字典（非 JSON 输出按原逻辑处理）
-- [ ] **CTX-06**: 上下文状态持久化 — 将解析后的上下文保存到任务数据中（`context` 字段），下次执行时可读取
+- [ ] **CTX-06**: 上下文状态持久化 — 将解析后的上下文保存到独立 JSON 文件（`~/.config/claw-cron/context/{task_name}.json`），与 tasks.yaml 分离（用户配置 vs 运行时状态），下次执行时可读取
 
 ### Conditional Notification (条件通知)
 
