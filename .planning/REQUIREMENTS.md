@@ -40,18 +40,18 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UPD-01 | — | Pending |
-| UPD-02 | — | Pending |
-| UPD-03 | — | Pending |
-| UPD-04 | — | Pending |
-| UPD-05 | — | Pending |
-| UPD-06 | — | Pending |
-| VER-02 | — | Pending |
+| UPD-01 | Phase 21 | Pending |
+| UPD-02 | Phase 21 | Pending |
+| UPD-03 | Phase 21 | Pending |
+| UPD-04 | Phase 21 | Pending |
+| UPD-05 | Phase 21 | Pending |
+| UPD-06 | Phase 21 | Pending |
+| VER-02 | Phase 21 | Pending |
 
 **Coverage:**
 - v3.1 requirements: 7 total
-- Mapped to phases: 0
-- Unmapped: 7
+- Mapped to phases: 7 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-18*

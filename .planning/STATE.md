@@ -1,59 +1,73 @@
----
-gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: Update 命令
-status: defining_requirements
-last_updated: "2026-04-18T12:00:00.000+08:00"
-last_activity: 2026-04-18 — Milestone v3.1 started
-progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
----
-
-# Project State: claw-cron
-
-**Last Updated:** 2026-04-18
+# Project State
 
 ## Project Reference
 
-**Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
+See: .planning/PROJECT.md (updated 2026-04-18)
 
-**Current Milestone:** v3.1 Update 命令
-
-**Current Focus:** Defining requirements
+**Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
+**Current focus:** Phase 21 — Update Command & Release
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-18 — Milestone v3.1 started
+Phase: 21 of 21 (Update Command & Release)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-04-18 — Roadmap created for v3.1
 
-Progress: [          ] 0%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-**Velocity:** —
-**Cycle Time:** —
-**Blocked Time:** 0h
+**Velocity:**
+- Total plans completed: 13 (across v1.0–v3.0)
+- Average duration: —
+- Total execution time: —
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 14 | 1 | — | — |
+| 15 | 1 | — | — |
+| 16 | 1 | — | — |
+| 17 | 2 | — | — |
+| 18 | 1 | — | — |
+| 19 | 3 | — | — |
+| 20 | 1 | — | — |
+
+**Recent Trend:**
+- Last 5 plans: —
+- Trend: Stable
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-- Phase numbering continues from Phase 20 (v3.0 ended at Phase 20)
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-### Active Todos
+- [Phase 20]: Conditional notification with when field — only sends when expression evaluates true
 
-None
+### Pending Todos
 
-### Blockers
+None yet.
 
-None
+### Blockers/Concerns
 
----
+None yet.
 
-*State updated: 2026-04-18*
+## Deferred Items
+
+Items acknowledged and carried forward from previous milestone close:
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| *(none)* | | | |
+
+## Session Continuity
+
+Last session: 2026-04-18
+Stopped at: Roadmap created for v3.1 milestone
+Resume file: None

@@ -1,14 +1,15 @@
-# Roadmap: claw-cron v3.0
+# Roadmap: claw-cron v3.1
 
-**Milestone:** v3.0 Command 上下文机制
+**Milestone:** v3.1 Update 命令
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Created:** 2026-04-17
+**Created:** 2026-04-18
 **Granularity:** coarse
 
 ## Milestones
 
 - ✅ **v2.4 微信通道 & Capture 增强** - Phases 14-17 (shipped 2026-04-17)
-- 🚧 **v3.0 Command 上下文机制** - Phases 18-20 (in progress)
+- ✅ **v3.0 Command 上下文机制** - Phases 18-20 (shipped 2026-04-18)
+- 🚧 **v3.1 Update 命令** - Phase 21 (in progress)
 
 ## Phases
 
@@ -33,64 +34,45 @@
 
 </details>
 
-### 🚧 v3.0 Command 上下文机制 (In Progress)
+<details>
+<summary>✅ v3.0 Command 上下文机制 (Phases 18-20) - SHIPPED 2026-04-18</summary>
 
-**Milestone Goal:** 为 command 类型任务增加双向上下文机制，让脚本可获取系统状态并回传执行结果，实现条件化通知
+### Phase 18: Data Model & Context Storage
+**Goal:** 任务配置支持环境变量定义和上下文持久化，通知可配置条件控制
+**Plans:** 1 plan complete
 
-- [x] **Phase 18: Data Model & Context Storage** - 扩展数据模型，支持上下文配置和持久化 *(completed 2026-04-17)*
-- [x] **Phase 19: Context Injection & Feedback** - 实现上下文注入与 JSON 回传 *(completed 2026-04-17)*
-- [x] **Phase 20: Conditional Notification & Release** - 条件通知与版本发布 *(completed 2026-04-18)*
+### Phase 19: Context Injection & Feedback
+**Goal:** 脚本在执行时可接收系统注入的上下文，并可通过 stdout 回传结构化数据
+**Plans:** 3 plans complete
+
+### Phase 20: Conditional Notification & Release
+**Goal:** 通知仅在条件满足时发送，版本升级到 0.3.0
+**Plans:** 1 plan complete
+
+</details>
+
+### 🚧 v3.1 Update 命令 (In Progress)
+
+**Milestone Goal:** 增加 update 命令，支持修改已有任务的字段，版本升级到 0.3.1
+
+- [ ] **Phase 21: Update Command & Release** - 实现 update 子命令，支持修改任务字段，版本升级到 0.3.1
 
 ## Phase Details
 
-### Phase 18: Data Model & Context Storage
+### Phase 21: Update Command & Release
 
-**Goal:** 任务配置支持环境变量定义和上下文持久化，通知可配置条件控制
+**Goal:** 用户可通过 update 命令修改已有任务的指定字段
 
-**Depends on:** Phase 17 (completed)
+**Depends on:** Phase 20 (completed)
 
-**Requirements:** CTX-02, CTX-06, COND-01
-
-**Success Criteria** (what must be TRUE):
-1. User can define custom environment variables in task config via the `env` field (key-value list)
-2. Task context data persists across executions — context from a previous run is available in subsequent runs
-3. User can specify a `when` condition expression in notify config to control notification delivery
-
-**Plans:** TBD
-
----
-
-### Phase 19: Context Injection & Feedback
-
-**Goal:** 脚本在执行时可接收系统注入的上下文，并可通过 stdout 回传结构化数据
-
-**Depends on:** Phase 18
-
-**Requirements:** CTX-01, CTX-03, CTX-04, CTX-05
+**Requirements:** UPD-01, UPD-02, UPD-03, UPD-04, UPD-05, UPD-06, VER-02
 
 **Success Criteria** (what must be TRUE):
-1. Scripts can read system context (task name, type, last exit code, last output) via CLAW_TASK_NAME, CLAW_TASK_TYPE, CLAW_LAST_EXIT_CODE, CLAW_LAST_OUTPUT environment variables
-2. Scripts can reference context values in script content using `{{ context.xxx }}` template syntax (e.g., `{{ context.signed_in }}`)
-3. Scripts can read full context JSON from a temp file whose path is provided in CLAW_CONTEXT_FILE environment variable
-4. Scripts can output JSON to stdout that gets parsed and persisted as task context for subsequent executions
-
-**Plans:** TBD
-
----
-
-### Phase 20: Conditional Notification & Release
-
-**Goal:** 通知仅在条件满足时发送，版本升级到 0.3.0
-
-**Depends on:** Phase 19
-
-**Requirements:** COND-02, COND-03, VER-01
-
-**Success Criteria** (what must be TRUE):
-1. Notification is sent only when the `when` expression evaluates to true against the task context (e.g., `signed_in == false` suppresses notification when user is signed in)
-2. `==` and `!=` operators work correctly for string and boolean value comparisons in when expressions
-3. Notifications are sent as before when no `when` field is specified — existing tasks continue to work unchanged
-4. Version number is updated to 0.3.0 in pyproject.toml
+1. User can run `claw-cron update <name>` to modify an existing task — name is required and locates the target task
+2. User can change a task's cron schedule via `--cron` option
+3. User can enable or disable a task via `--enabled` option
+4. User can update notification message, script content, or prompt content via `--message`, `--script`, `--prompt` options respectively
+5. Version number is updated to 0.3.1 in pyproject.toml
 
 **Plans:** TBD
 
@@ -99,34 +81,29 @@
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 18 → 19 → 20
+Phase 21
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 18. Data Model & Context Storage | v3.0 | 1/1 | Complete | 2026-04-17 |
-| 19. Context Injection & Feedback | v3.0 | 3/3 | Complete | 2026-04-17 |
-| 20. Conditional Notification & Release | v3.0 | 1/1 | Complete | 2026-04-18 |
+| 21. Update Command & Release | v3.1 | 0/? | Not started | - |
 
 ## Coverage
 
-- Total v3.0 requirements: 10
-- Mapped to phases: 10 ✓
+- Total v3.1 requirements: 7
+- Mapped to phases: 7 ✓
 - Orphaned requirements: 0 ✓
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTX-01 | Phase 19 | ✓ Complete |
-| CTX-02 | Phase 18 | ✓ Complete |
-| CTX-03 | Phase 19 | ✓ Complete |
-| CTX-04 | Phase 19 | ✓ Complete |
-| CTX-05 | Phase 19 | ✓ Complete |
-| CTX-06 | Phase 18 | ✓ Complete |
-| COND-01 | Phase 18 | ✓ Complete |
-| COND-02 | Phase 20 | ✓ Complete |
-| COND-03 | Phase 20 | ✓ Complete |
-| VER-01 | Phase 20 | ✓ Complete |
+| UPD-01 | Phase 21 | Pending |
+| UPD-02 | Phase 21 | Pending |
+| UPD-03 | Phase 21 | Pending |
+| UPD-04 | Phase 21 | Pending |
+| UPD-05 | Phase 21 | Pending |
+| UPD-06 | Phase 21 | Pending |
+| VER-02 | Phase 21 | Pending |
 
 ---
 
-*Roadmap created: 2026-04-17*
-*Milestone: v3.0*
+*Roadmap created: 2026-04-18*
+*Milestone: v3.1*
