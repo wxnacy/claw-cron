@@ -1,79 +1,84 @@
-# Requirements: claw-cron v2.3
+# Requirements: claw-cron v2.4
 
 **Defined:** 2026-04-17
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## v2.3 Requirements
+## v2.4 Requirements
 
-### UX Improvements
+### Version
 
-- [x] **UX-01**: channels add 命令使用 InquirerPy 列表选择通道类型
-- [x] **UX-02**: channels add 列表显示每个通道的配置状态
-- [x] **UX-03**: channels list 显示每个通道的详细配置状态
+- [ ] **VERS-01**: 软件版本号升级到 0.2.1
 
-### Feishu Channel
+### Architecture
 
-- [ ] **FEISHU-01**: 用户可以配置飞书应用凭证（app_id, app_secret）
-- [ ] **FEISHU-02**: 用户可以发送私聊文本消息（通过 open_id）
-- [ ] **FEISHU-03**: 系统自动管理 tenant_access_token 的获取和刷新
-- [ ] **FEISHU-04**: 系统处理飞书 API 频率限制（5 QPS/用户）
-- [ ] **FEISHU-05**: 用户可以通过交互获取自己的 open_id
+- [ ] **ARCH-01**: MessageChannel 新增 `supports_capture` 属性标识通道是否支持 capture
+- [ ] **ARCH-02**: MessageChannel 新增 `capture_openid()` 方法，支持通道特定的 capture 实现
+- [ ] **ARCH-03**: QQBotChannel 实现 `capture_openid()` 方法，封装现有 WebSocket 逻辑
+- [ ] **ARCH-04**: FeishuChannel 实现 `capture_openid()` 方法，封装现有 open_id 获取逻辑
 
-### Email Channel
+### Capture Enhancement
 
-- [x] **EMAIL-01**: 用户可以配置 SMTP 服务器（host, port, username, password, from_email）
-- [x] **EMAIL-02**: 用户可以发送纯文本邮件通知
-- [x] **EMAIL-03**: 用户可以发送 HTML 格式邮件通知
-- [x] **EMAIL-04**: 用户可以指定多个邮件收件人
-- [x] **EMAIL-05**: 用户可以在邮件中附加文件
+- [ ] **CAPT-01**: capture 命令支持交互式列表选择通道类型（替代 --channel-type 参数）
+- [ ] **CAPT-02**: capture 命令对不支持 capture 的通道给出友好提示
+- [ ] **CAPT-03**: channels add 验证成功后自动询问用户是否执行 capture
+- [ ] **CAPT-04**: capture 流程添加实时状态反馈（Rich console.status）
+- [ ] **CAPT-05**: capture 流程添加 5 分钟超时机制
 
-## v2.x Requirements (Deferred)
+### WeChat Channel
 
-### Email Channel Enhancements
+- [ ] **WECHAT-01**: 用户可配置企业微信应用凭证 (corp_id, agent_id, secret)
+- [ ] **WECHAT-02**: 用户可通过企业微信应用发送私聊文本消息
+- [ ] **WECHAT-03**: 用户可通过企业微信应用发送私聊 Markdown 消息
+- [ ] **WECHAT-04**: 系统自动管理 access_token 生命周期（获取、缓存、刷新）
+- [ ] **WECHAT-05**: 用户可通过 capture 流程获取企业微信 userid
 
-- **EMAIL-F01**: Markdown 转 HTML 渲染
-- **EMAIL-F02**: 邮件模板支持
-- **EMAIL-F03**: 发送状态追踪
+## v2 Requirements (Deferred)
 
-### Feishu Channel Enhancements
+### WeChat Personal
 
-- **FEISHU-F01**: 富文本消息（Post 类型）
-- **FEISHU-F02**: Markdown 消息支持
-- **FEISHU-F03**: 文件/图片附件
-- **FEISHU-F04**: 交互式卡片
+- **WECHAT-P01**: 支持个人微信消息发送（风险：封号风险高，需监控 iLink API 可用性）
+
+### WeChat Webhook
+
+- **WECHAT-W01**: 支持企业微信群机器人 Webhook（简单但仅支持群通知）
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 微信通道 | 后续版本扩展 |
-| 消息接收 | 仅支持发送通知，不接收用户消息 |
-| 邮件定时发送 | 由 claw-cron 调度器处理时机 |
-| 飞书群聊 | 聚焦私聊通知，群聊延后 |
+| 个人微信 API | 封号风险极高，需等待微信官方 iLink API 开放申请 |
+| 企业微信群机器人 | 仅支持群广播，不符合私聊通知场景 |
+| 微信图片/文件消息 | 增加复杂度，v2.4 聚焦文本通知 |
+| 多企业微信应用 | 多租户场景，暂无需求 |
+| 微信模板卡片消息 | 需要设计模板结构，复杂度高 |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UX-01 | Phase 11 | Complete |
-| UX-02 | Phase 11 | Complete |
-| UX-03 | Phase 11 | Complete |
-| FEISHU-01 | Phase 12 | Pending |
-| FEISHU-02 | Phase 12 | Pending |
-| FEISHU-03 | Phase 12 | Pending |
-| FEISHU-04 | Phase 12 | Pending |
-| FEISHU-05 | Phase 12 | Pending |
-| EMAIL-01 | Phase 13 | Complete |
-| EMAIL-02 | Phase 13 | Complete |
-| EMAIL-03 | Phase 13 | Complete |
-| EMAIL-04 | Phase 13 | Complete |
-| EMAIL-05 | Phase 13 | Complete |
+| VERS-01 | Phase N | Pending |
+| ARCH-01 | Phase N | Pending |
+| ARCH-02 | Phase N | Pending |
+| ARCH-03 | Phase N | Pending |
+| ARCH-04 | Phase N | Pending |
+| CAPT-01 | Phase N | Pending |
+| CAPT-02 | Phase N | Pending |
+| CAPT-03 | Phase N | Pending |
+| CAPT-04 | Phase N | Pending |
+| CAPT-05 | Phase N | Pending |
+| WECHAT-01 | Phase N | Pending |
+| WECHAT-02 | Phase N | Pending |
+| WECHAT-03 | Phase N | Pending |
+| WECHAT-04 | Phase N | Pending |
+| WECHAT-05 | Phase N | Pending |
 
 **Coverage:**
-- v2.3 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0 ✓
+- v2.4 requirements: 15 total
+- Mapped to phases: 0
+- Unmapped: 15 ⚠️
 
 ---
 *Requirements defined: 2026-04-17*
-*Last updated: 2026-04-17 after roadmap creation*
+*Last updated: 2026-04-17 after initial definition*
