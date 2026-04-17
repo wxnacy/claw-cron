@@ -21,11 +21,11 @@
 
 ### Email Channel
 
-- [ ] **EMAIL-01**: 用户可以配置 SMTP 服务器（host, port, username, password, from_email）
-- [ ] **EMAIL-02**: 用户可以发送纯文本邮件通知
-- [ ] **EMAIL-03**: 用户可以发送 HTML 格式邮件通知
-- [ ] **EMAIL-04**: 用户可以指定多个邮件收件人
-- [ ] **EMAIL-05**: 用户可以在邮件中附加文件
+- [x] **EMAIL-01**: 用户可以配置 SMTP 服务器（host, port, username, password, from_email）
+- [x] **EMAIL-02**: 用户可以发送纯文本邮件通知
+- [x] **EMAIL-03**: 用户可以发送 HTML 格式邮件通知
+- [x] **EMAIL-04**: 用户可以指定多个邮件收件人
+- [x] **EMAIL-05**: 用户可以在邮件中附加文件
 
 ## v2.x Requirements (Deferred)
 
@@ -63,11 +63,11 @@
 | FEISHU-03 | Phase 12 | Pending |
 | FEISHU-04 | Phase 12 | Pending |
 | FEISHU-05 | Phase 12 | Pending |
-| EMAIL-01 | Phase 13 | Pending |
-| EMAIL-02 | Phase 13 | Pending |
-| EMAIL-03 | Phase 13 | Pending |
-| EMAIL-04 | Phase 13 | Pending |
-| EMAIL-05 | Phase 13 | Pending |
+| EMAIL-01 | Phase 13 | Complete |
+| EMAIL-02 | Phase 13 | Complete |
+| EMAIL-03 | Phase 13 | Complete |
+| EMAIL-04 | Phase 13 | Complete |
+| EMAIL-05 | Phase 13 | Complete |
 
 **Coverage:**
 - v2.3 requirements: 13 total
