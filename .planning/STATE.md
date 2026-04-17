@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Command 上下文机制
-status: Ready to plan
-last_updated: "2026-04-17T15:00:00.000Z"
-last_activity: 2026-04-17
+status: planning
+last_updated: "2026-04-17T14:49:32.342Z"
+last_activity: 2026-04-17 — Roadmap created for v3.0
 progress:
-  total_phases: 3
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
