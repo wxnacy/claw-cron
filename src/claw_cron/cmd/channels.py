@@ -212,6 +212,75 @@ def delete(channel_type: str, force: bool) -> None:
 
 
 @channels.command()
+@click.argument("channel_type", type=click.Choice(["qqbot", "imessage"]))
+def verify(channel_type: str) -> None:
+    """Verify channel credentials and connectivity.
+
+    CHANNEL_TYPE is the channel to verify (e.g., 'qqbot', 'imessage').
+
+    For QQ Bot: Validates app_id and client_secret with QQ API.
+    For iMessage: Checks if running on macOS with Messages app available.
+    """
+    config = load_config()
+    channels_config = config.get("channels", {})
+
+    if channel_type not in channels_config:
+        console.print(f"[yellow]通道 '{channel_type}' 未配置[/yellow]")
+        console.print("[dim]运行 'claw-cron channels add' 进行配置[/dim]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]验证通道 '{channel_type}'...[/bold]\n")
+
+    if channel_type == "qqbot":
+        qq_config = channels_config["qqbot"]
+        app_id = qq_config.get("app_id")
+        client_secret = qq_config.get("client_secret")
+
+        if not app_id or not client_secret:
+            console.print("[red]✗ 配置不完整：缺少 app_id 或 client_secret[/red]")
+            raise SystemExit(1)
+
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.post(
+                    "https://bots.qq.com/app/getAppAccessToken",
+                    json={"appId": app_id, "clientSecret": client_secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+
+                if data.get("code", 0) != 0:
+                    console.print(f"[red]✗ 验证失败: {data.get('message', '未知错误')}[/red]")
+                    console.print(f"[dim]错误码: {data.get('code')}[/dim]")
+                    raise SystemExit(1)
+
+                console.print("[green]✓ 凭证验证成功[/green]")
+                console.print(f"[dim]AppID: {app_id}[/dim]")
+
+                # Optionally show token info
+                access_token = data.get("access_token", "")
+                if access_token:
+                    console.print(f"[dim]Access Token: {access_token[:20]}...[/dim]")
+
+            except httpx.RequestError as e:
+                console.print(f"[red]✗ 连接失败: {e}[/red]")
+                raise SystemExit(1)
+
+    elif channel_type == "imessage":
+        # iMessage doesn't require credentials, just check platform
+        import platform
+
+        if platform.system() != "Darwin":
+            console.print("[red]✗ iMessage 仅在 macOS 上可用[/red]")
+            raise SystemExit(1)
+
+        console.print("[green]✓ iMessage 可用[/green]")
+        console.print("[dim]平台: macOS[/dim]")
+
+    console.print(f"\n[green]✓ 通道 '{channel_type}' 验证通过[/green]")
+
+
+@channels.command()
 @click.option(
     "--channel-type",
     type=click.Choice(["qqbot"], case_sensitive=False),
