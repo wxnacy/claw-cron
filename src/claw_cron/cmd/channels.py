@@ -16,7 +16,7 @@ from rich.table import Table
 
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
-from claw_cron.prompt import prompt_confirm
+from claw_cron.prompt import prompt_confirm, prompt_channel_select
 from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
 from claw_cron.channels.qqbot import QQBotConfig
 
@@ -39,69 +39,83 @@ def channels() -> None:
 
 @channels.command()
 @click.option(
-    "--channel-type",
-    type=click.Choice(["qqbot"], case_sensitive=False),
-    prompt="Channel type",
-    help="Type of channel to configure",
-)
-@click.option(
-    "--app-id",
-    prompt="AppID",
-    help="QQ Bot AppID from q.qq.com",
-)
-@click.option(
-    "--client-secret",
-    prompt=True,
-    hide_input=True,
-    help="QQ Bot Client Secret",
-)
-@click.option(
     "--capture-openid",
     is_flag=True,
     default=False,
     help="Connect WebSocket to capture user openid after configuration",
 )
-def add(channel_type: str, app_id: str, client_secret: str, capture_openid: bool) -> None:
+def add(capture_openid: bool) -> None:
     """Add a new message channel configuration.
 
-    Interactive prompt to configure QQ Bot credentials.
+    Interactive prompt to configure message channel credentials.
+    Channel type is selected from an interactive list with status display.
     Credentials are validated before saving.
     """
+    # Interactive channel selection
+    channel_type = prompt_channel_select()
     channel_type = channel_type.lower()
 
-    # Validate credentials before saving
-    with console.status("[bold green]Validating credentials..."):
-        try:
-            response = httpx.post(
-                "https://bots.qq.com/app/getAppAccessToken",
-                json={"appId": app_id, "clientSecret": client_secret},
-                timeout=10.0,
-            )
-            data = response.json()
-            if data.get("code", 0) != 0:
-                raise click.ClickException(
-                    f"Validation failed: {data.get('message', 'Unknown error')}"
-                )
-            console.print("[green]✓ Credentials validated[/green]")
-        except httpx.RequestError as e:
-            raise click.ClickException(f"Connection failed: {e}") from e
-
-    # Save to config.yaml
+    # Check if already configured and prompt for overwrite
     config = load_config()
-    if "channels" not in config:
-        config["channels"] = {}
-    config["channels"][channel_type] = {
-        "app_id": app_id,
-        "client_secret": client_secret,
-        "enabled": True,
-    }
-    save_config(config)
-    console.print(f"[green]✓ Channel '{channel_type}' configured[/green]")
+    channels_config = config.get("channels", {})
 
-    # Handle capture_openid flag
-    if capture_openid:
-        console.print("\n[bold]Step 2: Capture User OpenID[/bold]\n")
-        asyncio.run(_capture_qqbot_openid(alias="me"))
+    if channel_type in channels_config:
+        if not prompt_confirm(f"通道 '{channel_type}' 已配置，是否覆盖?"):
+            console.print("[dim]已取消[/dim]")
+            return
+
+    # Channel-specific configuration flow
+    if channel_type == "qqbot":
+        app_id = click.prompt("AppID", type=str)
+        client_secret = click.prompt("Client Secret", type=str, hide_input=True)
+
+        # Validate credentials before saving
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.post(
+                    "https://bots.qq.com/app/getAppAccessToken",
+                    json={"appId": app_id, "clientSecret": client_secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+                if data.get("code", 0) != 0:
+                    raise click.ClickException(
+                        f"验证失败: {data.get('message', '未知错误')}"
+                    )
+                console.print("[green]✓ 凭证验证成功[/green]")
+            except httpx.RequestError as e:
+                raise click.ClickException(f"连接失败: {e}") from e
+
+        # Save to config.yaml
+        if "channels" not in config:
+            config["channels"] = {}
+        config["channels"][channel_type] = {
+            "app_id": app_id,
+            "client_secret": client_secret,
+            "enabled": True,
+        }
+        save_config(config)
+        console.print(f"[green]✓ 通道 '{channel_type}' 配置完成[/green]")
+
+        # Handle capture_openid flag
+        if capture_openid:
+            console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
+            asyncio.run(_capture_qqbot_openid(alias="me"))
+
+    elif channel_type == "imessage":
+        # iMessage doesn't require credentials
+        if "channels" not in config:
+            config["channels"] = {}
+        config["channels"][channel_type] = {
+            "enabled": True,
+        }
+        save_config(config)
+        console.print(f"[green]✓ 通道 '{channel_type}' 已启用[/green]")
+        console.print("[dim]iMessage 无需配置凭证[/dim]")
+
+    else:
+        console.print(f"[yellow]通道 '{channel_type}' 的配置流程尚未实现[/yellow]")
+        console.print("[dim]将在后续版本中支持[/dim]")
 
 
 @channels.command("list")
