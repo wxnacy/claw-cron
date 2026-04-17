@@ -4,7 +4,7 @@ milestone: v3.0
 milestone_name: Command 上下文机制
 status: planning
 last_updated: "2026-04-17T15:22:15.892Z"
-last_activity: 2026-04-17 — Phase 18 complete (Data Model & Context Storage)
+last_activity: 2026-04-17 — Phase 19 complete (Context Injection & Feedback)
 progress:
   total_phases: 7
   completed_phases: 1
@@ -23,14 +23,14 @@ progress:
 
 **Current Milestone:** v3.0 Command 上下文机制
 
-**Current Focus:** Phase 19 — Context Injection & Feedback
+**Current Focus:** Phase 20 — Conditional Notification & Release
 
 ## Current Position
 
-Phase: 19 of 20 (Context Injection & Feedback)
+Phase: 20 of 20 (Conditional Notification & Release)
 Plan: —
 Status: Ready to plan
-Last activity: 2026-04-17 — Phase 18 complete (Data Model & Context Storage)
+Last activity: 2026-04-17 — Phase 19 complete (Context Injection & Feedback)
 
 Progress: [░░░░░░░░░░] 0%
 
