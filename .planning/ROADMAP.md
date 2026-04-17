@@ -8,7 +8,7 @@
 ## Phases
 
 - [x] **Phase 11: UX Improvements** - 交互体验改进：列表选择、配置状态展示 (completed 2026-04-17)
-- [ ] **Phase 12: Feishu Channel** - 飞书私聊消息通知通道
+- [x] **Phase 12: Feishu Channel** - 飞书私聊消息通知通道 (completed 2026-04-17)
 - [ ] **Phase 13: Email Channel** - SMTP 邮件通知通道
 
 ## Phase Details
@@ -52,11 +52,11 @@
 4. System automatically manages tenant_access_token lifecycle (acquisition and refresh)
 5. System handles Feishu API rate limits (5 QPS per user) with automatic retry
 
-**Plans:** 2 plans in 2 waves
+**Plans:** 2/2 plans complete
 
 **Plan List:**
-- [ ] 12-01-PLAN.md — Core FeishuChannel implementation with SDK integration
-- [ ] 12-02-PLAN.md — CLI integration for feishu channel (add/verify/capture)
+- [x] 12-01-PLAN.md — Core FeishuChannel implementation with SDK integration
+- [x] 12-02-PLAN.md — CLI integration for feishu channel (add/verify/capture)
 
 ---
 
@@ -84,7 +84,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 11. UX Improvements | 3/3 | Complete    | 2026-04-17 |
-| 12. Feishu Channel | 0/2 | Ready | - |
+| 12. Feishu Channel | 2/2 | Complete    | 2026-04-17 |
 | 13. Email Channel | 0/0 | Not started | - |
 
 ## Coverage
