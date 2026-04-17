@@ -8,7 +8,7 @@
 ## Phases
 
 - [x] **Phase 14: Architecture Enhancement** - Capture 统一抽象，为通道提供 capture 支持 *(completed 2026-04-17)*
-- [ ] **Phase 15: Capture Interaction** - 改进 capture 交互体验，自动化 capture 流程
+- [x] **Phase 15: Capture Interaction** - 改进 capture 交互体验，自动化 capture 流程 *(completed 2026-04-17)*
 - [ ] **Phase 16: WeChat Channel** - 企业微信应用消息通知通道
 - [ ] **Phase 17: Verification & Release** - 功能验证与版本升级
 
@@ -96,7 +96,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 14. Architecture Enhancement | 1/1 | Complete | 2026-04-17 |
-| 15. Capture Interaction | 0/0 | Not started | - |
+| 15. Capture Interaction | 1/1 | Complete | 2026-04-17 |
 | 16. WeChat Channel | 0/0 | Not started | - |
 | 17. Verification & Release | 0/0 | Not started | - |
 
