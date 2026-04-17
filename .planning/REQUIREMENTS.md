@@ -7,9 +7,9 @@
 
 ### UX Improvements
 
-- [ ] **UX-01**: channels add 命令使用 InquirerPy 列表选择通道类型
-- [ ] **UX-02**: channels add 列表显示每个通道的配置状态
-- [ ] **UX-03**: channels list 显示每个通道的详细配置状态
+- [x] **UX-01**: channels add 命令使用 InquirerPy 列表选择通道类型
+- [x] **UX-02**: channels add 列表显示每个通道的配置状态
+- [x] **UX-03**: channels list 显示每个通道的详细配置状态
 
 ### Feishu Channel
 
@@ -55,9 +55,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UX-01 | Phase 11 | Pending |
-| UX-02 | Phase 11 | Pending |
-| UX-03 | Phase 11 | Pending |
+| UX-01 | Phase 11 | Complete |
+| UX-02 | Phase 11 | Complete |
+| UX-03 | Phase 11 | Complete |
 | FEISHU-01 | Phase 12 | Pending |
 | FEISHU-02 | Phase 12 | Pending |
 | FEISHU-03 | Phase 12 | Pending |

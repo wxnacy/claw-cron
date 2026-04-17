@@ -7,7 +7,7 @@
 
 ## Phases
 
-- [ ] **Phase 11: UX Improvements** - 交互体验改进：列表选择、配置状态展示
+- [x] **Phase 11: UX Improvements** - 交互体验改进：列表选择、配置状态展示 (completed 2026-04-17)
 - [ ] **Phase 12: Feishu Channel** - 飞书私聊消息通知通道
 - [ ] **Phase 13: Email Channel** - SMTP 邮件通知通道
 
@@ -26,12 +26,12 @@
 2. User can see which channels are configured/unconfigured in the `channels add` selection list
 3. User can view detailed configuration status for each channel in `channels list` output
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 **Plan List:**
-- [ ] 11-01-PLAN.md — Channel status functions (get_channel_status, prompt_channel_select)
-- [ ] 11-02-PLAN.md — Interactive channel add command with overwrite confirmation
-- [ ] 11-03-PLAN.md — Enhanced channel list and verify commands
+- [x] 11-01-PLAN.md — Channel status functions (get_channel_status, prompt_channel_select)
+- [x] 11-02-PLAN.md — Interactive channel add command with overwrite confirmation
+- [x] 11-03-PLAN.md — Enhanced channel list and verify commands
 
 **UI hint:** yes
 
@@ -79,7 +79,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. UX Improvements | 0/3 | Not started | - |
+| 11. UX Improvements | 3/3 | Complete    | 2026-04-17 |
 | 12. Feishu Channel | 0/0 | Not started | - |
 | 13. Email Channel | 0/0 | Not started | - |
 
