@@ -14,6 +14,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from claw_cron.condition import evaluate_when
 from claw_cron.config import get_client_cmd
 from claw_cron.context import load_context, save_context
 from claw_cron.notifier import Notifier, render_message
@@ -202,7 +203,7 @@ async def execute_task_with_notify(task: Task) -> int:
     merged["execution_count"] = existing.get("execution_count", 0) + 1
     save_context(task.name, merged)
 
-    if task.notify:
+    if task.notify and evaluate_when(task.notify.when, merged):
         try:
             notifier = Notifier()
             results = await notifier.notify_task_result(task, exit_code, output)
