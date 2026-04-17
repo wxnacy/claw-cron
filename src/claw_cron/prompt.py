@@ -13,6 +13,8 @@ from __future__ import annotations
 from InquirerPy import inquirer
 from InquirerPy.base.control import Choice
 
+from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
+
 
 def prompt_text(message: str, default: str | None = None) -> str:
     """Prompt user for text input.
@@ -109,3 +111,34 @@ def prompt_cron() -> str:
         return prompt_text("输入自定义 Cron 表达式 (分 时 日 月 周):")
 
     return selected
+
+
+def prompt_channel_select() -> str:
+    """Prompt user to select a channel type with status indicators.
+
+    Displays all registered channels with their configuration status:
+        - qqbot (已配置 ✓)
+        - imessage (未配置 ○)
+
+    Returns:
+        The selected channel identifier string.
+
+    Example:
+        >>> channel = prompt_channel_select()
+        # User sees list with status icons, selects one
+        >>> print(channel)
+        'qqbot'
+    """
+    choices = []
+
+    # Build choices with status for each registered channel
+    for channel_id in sorted(CHANNEL_REGISTRY.keys()):
+        icon, status_text = get_channel_status(channel_id)
+        # Format: "channel_name (status_text icon)"
+        name = f"{channel_id} ({status_text} {icon})"
+        choices.append(Choice(value=channel_id, name=name))
+
+    return inquirer.select(
+        message="选择通道类型:",
+        choices=choices,
+    ).execute()
