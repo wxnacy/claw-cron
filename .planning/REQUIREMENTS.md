@@ -58,26 +58,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VERS-01 | Phase N | Pending |
-| ARCH-01 | Phase N | Pending |
-| ARCH-02 | Phase N | Pending |
-| ARCH-03 | Phase N | Pending |
-| ARCH-04 | Phase N | Pending |
-| CAPT-01 | Phase N | Pending |
-| CAPT-02 | Phase N | Pending |
-| CAPT-03 | Phase N | Pending |
-| CAPT-04 | Phase N | Pending |
-| CAPT-05 | Phase N | Pending |
-| WECHAT-01 | Phase N | Pending |
-| WECHAT-02 | Phase N | Pending |
-| WECHAT-03 | Phase N | Pending |
-| WECHAT-04 | Phase N | Pending |
-| WECHAT-05 | Phase N | Pending |
+| ARCH-01 | Phase 14 | Pending |
+| ARCH-02 | Phase 14 | Pending |
+| ARCH-03 | Phase 14 | Pending |
+| ARCH-04 | Phase 14 | Pending |
+| CAPT-01 | Phase 15 | Pending |
+| CAPT-02 | Phase 15 | Pending |
+| CAPT-03 | Phase 15 | Pending |
+| CAPT-04 | Phase 15 | Pending |
+| CAPT-05 | Phase 15 | Pending |
+| WECHAT-01 | Phase 16 | Pending |
+| WECHAT-02 | Phase 16 | Pending |
+| WECHAT-03 | Phase 16 | Pending |
+| WECHAT-04 | Phase 16 | Pending |
+| WECHAT-05 | Phase 16 | Pending |
+| VERS-01 | Phase 17 | Pending |
 
 **Coverage:**
 - v2.4 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15 ⚠️
+- Mapped to phases: 15 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-17*
