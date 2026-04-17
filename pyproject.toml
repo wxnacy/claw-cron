@@ -23,6 +23,8 @@ dependencies = [
     "tenacity",
     "inquirerpy>=0.3.4",
     "websockets",
+    "lark-oapi>=1.5.3",
+    "httpx",
 ]
 
 [project.scripts]
