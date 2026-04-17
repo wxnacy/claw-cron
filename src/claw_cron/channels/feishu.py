@@ -21,6 +21,7 @@ Recipient Formats:
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import lark_oapi as lark
@@ -39,7 +40,7 @@ from tenacity import (
 )
 
 from .base import ChannelConfig, MessageChannel, MessageResult
-from .exceptions import ChannelAuthError, ChannelConfigError, ChannelSendError
+from .exceptions import ChannelAuthError, ChannelConfigError, ChannelError, ChannelSendError
 from .qqbot import parse_recipient
 
 
@@ -281,6 +282,70 @@ class FeishuChannel(MessageChannel):
             return MessageResult(success=False, error=str(e))
         except (FeishuRateLimitError, ChannelAuthError) as e:
             return MessageResult(success=False, error=str(e))
+
+    @property
+    def supports_capture(self) -> bool:
+        return True
+
+    async def capture_openid(self, timeout: int = 300) -> str:
+        """Capture user openid via Feishu WebSocket.
+
+        Args:
+            timeout: Timeout in seconds (default: 300).
+
+        Returns:
+            Captured open_id string (starts with "ou_").
+
+        Raises:
+            ChannelConfigError: If app_id or app_secret is not configured.
+            ChannelError: If capture times out or connection fails.
+        """
+        self._validate_config()
+
+        from claw_cron.feishu.events import parse_feishu_message
+
+        captured_openid: str | None = None
+
+        def on_message_received(data: lark.im.v1.P2ImMessageReceiveV1) -> None:
+            nonlocal captured_openid
+            event_data = {
+                "sender": {"sender_id": {"open_id": data.event.sender.sender_id.open_id}},
+                "message": {
+                    "content": data.event.message.content,
+                    "message_id": data.event.message.message_id,
+                    "chat_id": data.event.message.chat_id,
+                    "create_time": data.event.message.create_time,
+                },
+            }
+            message = parse_feishu_message(event_data)
+            captured_openid = message.openid
+
+        event_handler = (
+            lark.EventDispatcherHandler.builder("", "")
+            .register_p2_im_message_receive_v1(on_message_received)
+            .build()
+        )
+        ws_client = lark.ws.Client(
+            self.config.app_id,
+            self.config.app_secret,
+            event_handler=event_handler,
+            log_level=lark.LogLevel.ERROR,
+        )
+
+        async def _wait_for_capture() -> None:
+            while not captured_openid:
+                await asyncio.sleep(0.1)
+
+        async def _do_capture() -> str:
+            await asyncio.gather(ws_client.start(), _wait_for_capture())
+            return captured_openid  # type: ignore[return-value]
+
+        try:
+            return await asyncio.wait_for(_do_capture(), timeout=timeout)
+        except asyncio.TimeoutError:
+            raise ChannelError(
+                f"Capture timed out after {timeout}s", channel_id=self.channel_id
+            )
 
     async def close(self) -> None:
         """Close the SDK client."""

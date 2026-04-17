@@ -27,6 +27,7 @@ Note:
 
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -42,8 +43,10 @@ from tenacity import (
     wait_exponential,
 )
 
+from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
+
 from .base import ChannelConfig, MessageChannel, MessageResult
-from .exceptions import ChannelAuthError, ChannelConfigError, ChannelSendError
+from .exceptions import ChannelAuthError, ChannelConfigError, ChannelError, ChannelSendError
 
 
 # =============================================================================
@@ -491,6 +494,52 @@ class QQBotChannel(MessageChannel):
             return MessageResult(success=False, error=str(e))
         except (QQBotRateLimitError, ChannelAuthError) as e:
             return MessageResult(success=False, error=str(e))
+
+    @property
+    def supports_capture(self) -> bool:
+        return True
+
+    async def capture_openid(self, timeout: int = 300) -> str:
+        """Capture user openid via QQ Bot WebSocket.
+
+        Args:
+            timeout: Timeout in seconds (default: 300).
+
+        Returns:
+            Captured openid string (use as c2c:OPENID recipient).
+
+        Raises:
+            ChannelConfigError: If app_id or client_secret is not configured.
+            ChannelError: If capture times out or connection fails.
+        """
+        token = await self._get_access_token()
+
+        gateway_config = GatewayConfig(app_id=self.config.app_id, access_token=token)
+        ws_client = QQBotWebSocket(gateway_config)
+        captured_openid: str | None = None
+
+        async def on_message(message) -> None:
+            nonlocal captured_openid
+            captured_openid = message.openid
+            await ws_client.close()
+
+        ws_client.on_c2c_message = on_message
+
+        async def _wait_for_capture() -> None:
+            while not captured_openid:
+                await asyncio.sleep(0.1)
+
+        async def _do_capture() -> str:
+            await asyncio.gather(ws_client.connect(), _wait_for_capture())
+            return captured_openid  # type: ignore[return-value]
+
+        try:
+            return await asyncio.wait_for(_do_capture(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await ws_client.close()
+            raise ChannelError(
+                f"Capture timed out after {timeout}s", channel_id=self.channel_id
+            )
 
     async def close(self) -> None:
         """Close the HTTP client connection."""

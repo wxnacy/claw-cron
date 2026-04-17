@@ -160,6 +160,29 @@ class MessageChannel(ABC):
         """
         return True
 
+    @property
+    def supports_capture(self) -> bool:
+        """Whether this channel supports openid capture via WebSocket."""
+        return False
+
+    async def capture_openid(self, timeout: int = 300) -> str:
+        """Capture user openid by waiting for an incoming message.
+
+        Args:
+            timeout: Timeout in seconds (default: 300s / 5 min).
+
+        Returns:
+            Captured openid string.
+
+        Raises:
+            NotImplementedError: If channel doesn't support capture.
+            ChannelConfigError: If channel is not configured.
+            ChannelError: If capture fails or times out.
+        """
+        raise NotImplementedError(
+            f"{self.channel_id} does not support capture"
+        )
+
     def get_channel_name(self) -> str:
         """Return channel name for logging/debugging.
 

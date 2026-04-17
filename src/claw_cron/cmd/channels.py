@@ -17,9 +17,7 @@ from rich.table import Table
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
 from claw_cron.prompt import prompt_confirm, prompt_channel_select
-from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
 from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
-from claw_cron.channels.qqbot import QQBotConfig
 
 console = Console()
 
@@ -102,7 +100,16 @@ def add(capture_openid: bool) -> None:
         # Handle capture_openid flag
         if capture_openid:
             console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
-            asyncio.run(_capture_qqbot_openid(alias="me"))
+            from claw_cron.channels import get_channel
+            from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
+            ch = get_channel("qqbot")
+            try:
+                openid = asyncio.run(ch.capture_openid())
+                from claw_cron.contacts import Contact, save_contact
+                save_contact(Contact(openid=openid, channel="qqbot", alias="me", created=datetime.now().isoformat()))
+                console.print(f"[green]✓ OpenID 已捕获并保存: {openid}[/green]")
+            except (ChannelError, ChannelConfigError) as e:
+                console.print(f"[red]Capture 失败: {e}[/red]")
 
     elif channel_type == "feishu":
         app_id = click.prompt("App ID", type=str)
@@ -140,7 +147,16 @@ def add(capture_openid: bool) -> None:
         # Handle capture_openid flag
         if capture_openid:
             console.print("\n[bold]步骤 2: 获取用户 OpenID[/bold]\n")
-            asyncio.run(_capture_feishu_openid(alias="me"))
+            from claw_cron.channels import get_channel
+            from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
+            ch = get_channel("feishu")
+            try:
+                openid = asyncio.run(ch.capture_openid())
+                from claw_cron.contacts import Contact, save_contact
+                save_contact(Contact(openid=openid, channel="feishu", alias="me", created=datetime.now().isoformat()))
+                console.print(f"[green]✓ OpenID 已捕获并保存: {openid}[/green]")
+            except (ChannelError, ChannelConfigError) as e:
+                console.print(f"[red]Capture 失败: {e}[/red]")
 
     elif channel_type == "email":
         host = click.prompt("SMTP Host", type=str)
@@ -452,168 +468,39 @@ def capture(channel_type: str, alias: str) -> None:
         claw-cron channels capture --alias my_friend
         # Then send any message to your QQ Bot
     """
-    if channel_type == "qqbot":
-        asyncio.run(_capture_qqbot_openid(alias))
-    elif channel_type == "feishu":
-        asyncio.run(_capture_feishu_openid(alias))
+    from claw_cron.channels import get_channel
+    from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
 
+    channel = get_channel(channel_type)
 
-async def _capture_qqbot_openid(alias: str) -> None:
-    """Capture OpenID from QQ Bot WebSocket."""
-    from claw_cron.channels.qqbot import QQBotChannel
+    if not channel.supports_capture:
+        console.print(f"[yellow]通道 '{channel_type}' 不需要 capture[/yellow]")
+        return
 
-    # Load config
-    config = load_config()
-    qq_config = config.get("channels", {}).get("qqbot", {})
-    app_id = qq_config.get("app_id")
-    client_secret = qq_config.get("client_secret")
-
-    if not app_id or not client_secret:
-        console.print("[red]Error: QQ Bot not configured.[/red]")
-        console.print("[dim]Run 'claw-cron channels add' first.[/dim]")
-        raise SystemExit(1)
-
-    # Get access token
-    with console.status("[bold green]Getting access token..."):
-        try:
-            qqbot_config = QQBotConfig(app_id=app_id, client_secret=client_secret)
-            # Create temporary channel instance for token
-            channel = QQBotChannel(qqbot_config)
-            token = await channel._get_access_token()
-            await channel.close()
-        except Exception as e:
-            console.print(f"[red]Failed to get access token: {e}[/red]")
-            raise SystemExit(1)
-
-    # Prepare WebSocket
-    gateway_config = GatewayConfig(app_id=app_id, access_token=token)
-    ws_client = QQBotWebSocket(gateway_config)
-
-    captured_openid: str | None = None
-
-    async def on_message(message) -> None:
-        nonlocal captured_openid
-        captured_openid = message.openid
-        console.print(f"\n[green]✓ OpenID captured: [bold]{message.openid}[/bold][/green]")
-        console.print(f"[dim]Message content: {message.content}[/dim]")
-
-    ws_client.on_c2c_message = on_message
-
-    # Connect and wait
-    console.print("\n[bold]Waiting for message...[/bold]")
-    console.print("[dim]Send any message to your QQ Bot to capture your openid.[/dim]")
-    console.print("[dim]Press Ctrl+C to cancel.[/dim]\n")
+    console.print(f"\n[bold]等待消息...[/bold]")
+    console.print(f"[dim]向你的 {channel_type} 机器人发送任意消息以捕获 openid[/dim]")
+    console.print("[dim]按 Ctrl+C 取消[/dim]\n")
 
     try:
-        # Run until openid captured or user cancels
-        async def wait_for_capture() -> None:
-            while not captured_openid:
-                await asyncio.sleep(0.5)
-            # Capture complete - close WebSocket to allow gather() to return
-            await ws_client.close()
+        with console.status(f"[bold green]等待来自 {channel_type} 的消息..."):
+            openid = asyncio.run(channel.capture_openid())
+        console.print(f"[green]✓ OpenID 已捕获: [bold]{openid}[/bold][/green]")
 
-        await asyncio.gather(
-            ws_client.connect(),
-            wait_for_capture()
-        )
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Cancelled.[/yellow]")
-        return
-    finally:
-        await ws_client.close()
-
-    # Save contact
-    if captured_openid:
         contact = Contact(
-            openid=captured_openid,
-            channel="qqbot",
+            openid=openid,
+            channel=channel_type,
             alias=alias,
             created=datetime.now().isoformat(),
         )
         save_contact(contact)
-        console.print(f"\n[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
-        console.print(f"[dim]You can now use 'claw-cron remind --recipient {alias}'[/dim]")
-
-
-async def _capture_feishu_openid(alias: str) -> None:
-    """Capture OpenID from Feishu WebSocket."""
-    import lark_oapi as lark
-
-    from claw_cron.feishu.events import parse_feishu_message
-
-    # Load config
-    config = load_config()
-    feishu_config = config.get("channels", {}).get("feishu", {})
-    app_id = feishu_config.get("app_id")
-    app_secret = feishu_config.get("app_secret")
-
-    if not app_id or not app_secret:
-        console.print("[red]Error: Feishu not configured.[/red]")
-        console.print("[dim]Run 'claw-cron channels add' first.[/dim]")
+        console.print(f"[green]✓ 联系人已保存为 '[bold]{alias}[/bold]'[/green]")
+        console.print(f"[dim]现在可以使用 'claw-cron remind --recipient {alias}'[/dim]")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]已取消[/yellow]")
+    except (ChannelError, ChannelConfigError) as e:
+        console.print(f"[red]Capture 失败: {e}[/red]")
         raise SystemExit(1)
 
-    captured_openid: str | None = None
-
-    def on_message_received(data: lark.im.v1.P2ImMessageReceiveV1) -> None:
-        nonlocal captured_openid
-        event_data = {
-            "sender": {
-                "sender_id": {
-                    "open_id": data.event.sender.sender_id.open_id
-                }
-            },
-            "message": {
-                "content": data.event.message.content,
-                "message_id": data.event.message.message_id,
-                "chat_id": data.event.message.chat_id,
-                "create_time": data.event.message.create_time,
-            },
-        }
-        message = parse_feishu_message(event_data)
-        captured_openid = message.openid
-        console.print(f"\n[green]✓ OpenID captured: [bold]{message.openid}[/bold][/green]")
-        console.print(f"[dim]Message content: {message.content}[/dim]")
-
-    event_handler = (
-        lark.EventDispatcherHandler.builder("", "")
-        .register_p2_im_message_receive_v1(on_message_received)
-        .build()
-    )
-
-    ws_client = lark.ws.Client(
-        app_id,
-        app_secret,
-        event_handler=event_handler,
-        log_level=lark.LogLevel.INFO,
-    )
-
-    console.print("\n[bold]Waiting for message...[/bold]")
-    console.print("[dim]Send any message to your Feishu bot to capture your openid.[/dim]")
-    console.print("[dim]Press Ctrl+C to cancel.[/dim]\n")
-
-    try:
-        async def wait_for_capture() -> None:
-            while not captured_openid:
-                await asyncio.sleep(0.5)
-
-        await asyncio.gather(
-            ws_client.start(),
-            wait_for_capture(),
-        )
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Cancelled.[/yellow]")
-        return
-
-    if captured_openid:
-        contact = Contact(
-            openid=captured_openid,
-            channel="feishu",
-            alias=alias,
-            created=datetime.now().isoformat(),
-        )
-        save_contact(contact)
-        console.print(f"\n[green]✓ Contact saved as '[bold]{alias}[/bold]'[/green]")
-        console.print(f"[dim]You can now use 'claw-cron remind --recipient {alias}'[/dim]")
 
 
 @click.group()
