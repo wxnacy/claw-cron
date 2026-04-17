@@ -8,6 +8,16 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 
 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
+## Current Milestone: v2.3 邮件 & 飞书通道
+
+**Goal:** 扩展消息通知能力，支持邮件和飞书通道，并改进交互体验
+
+**Target features:**
+- 邮件通道：SMTP 发送通知
+- 飞书通道：私聊通知（类似 QQ Bot 方式，需调研）
+- channels add 交互改进：列表选择 + 配置状态展示
+- channels list 改进：显示每个通道的配置状态
+
 ## Requirements
 
 ### Validated
@@ -24,28 +34,20 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
   - 通道管理命令 (Phase 9)
   - WebSocket & OpenID 捕获
 
-### Active (v2.2)
+### Active (v2.3)
 
-- [ ] InquirerPy 集成：统一交互式 CLI 体验
-- [ ] remind 交互式模式：无参数进入交互引导
-- [ ] command 命令：新增专门创建 command 类型任务
-- [ ] Cron 预设选择：降低 cron 语法学习门槛
-
-### Validated
-
-- ✅ **v2.0 里程碑已完成** (2026-04-16)
-  - AI Provider 重构 (Phase 5)
-  - 消息通道基础 + iMessage (Phase 6)
-  - QQ 通道 (Phase 7)
-  - 任务通知 + 定时提醒 (Phase 8)
+- [ ] 邮件通道实现
+- [ ] 飞书通道实现
+- [ ] channels add 交互改进
+- [ ] channels list 状态展示
 
 ### Out of Scope
 
 - 系统 crontab 集成 — 项目自管理调度，不依赖 crontab
 - Web UI — CLI 优先
 - 多用户/权限管理 — 单用户本地工具
-- 微信/飞书通道 — v2 不包含，后续扩展
-- 消息接收/远程控制 — v2 仅支持发送通知
+- 微信通道 — 后续扩展
+- 消息接收/远程控制 — 仅支持发送通知
 
 ## Context
 

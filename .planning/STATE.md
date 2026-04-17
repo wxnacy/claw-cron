@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: milestone
-status: completed
-last_updated: "2026-04-16T18:51:55.657Z"
+milestone: v2.3
+milestone_name: 邮件 & 飞书通道
+status: planning
+last_updated: "2026-04-17T00:00:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State: claw-cron
@@ -19,75 +19,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-17)
 
 **Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Current focus:** Phase 10 — interactive-commands
+**Current focus:** Defining requirements
 
-## Current Status
+## Current Position
 
-**Phase:** 10
-**Plan:** Not started
-**Status:** Milestone complete
-
-## Phase Progress (v2.2)
-
-| Phase | Name | Status |
-|-------|------|--------|
-| 10 | Interactive Commands | Planning |
-
-## Phase 10 Plans
-
-| Plan | Objective | Wave | Tasks | Status |
-|------|-----------|------|-------|--------|
-| 10-01 | InquirerPy 集成 & prompt 模块 | 1 | TBD | Pending |
-| 10-02 | 替换现有交互式调用 | 1 | TBD | Pending |
-| 10-03 | remind 交互式模式 | 2 | TBD | Pending |
-| 10-04 | command 命令实现 | 2 | TBD | Pending |
-
-## Requirements Coverage (v2.2)
-
-| Requirement | Plan | Status |
-|-------------|------|--------|
-| INTERACT-01 | 10-01 | Pending |
-| INTERACT-02 | 10-03 | Pending |
-| INTERACT-03 | 10-04 | Pending |
-| INTERACT-04 | 10-02 | Pending |
-| INTERACT-05 | 10-01 | Pending |
-| INTERACT-06 | 10-04 | Pending |
-
-## Next Action
-
-Run `/gsd-plan-phase 10` to start planning Phase 10.
-
----
-
-## Previous Milestone (v2.1) Summary
-
-| Phase | Name | Status |
-|-------|------|--------|
-| 9 | Channel Management Commands | Complete |
-
-All CHAN-MGMT-01~07 requirements completed.
-
----
-
-## Decisions
-
-- **2026-04-17**: v2.2 milestone focuses on interactive CLI improvements
-- **2026-04-17**: Use InquirerPy (not python-inquirer) for richer interaction types
-- **2026-04-17**: New `command` command for creating command-type tasks
-- **2026-04-17**: Both `remind` and `command` support direct + interactive modes
-- **2026-04-17**: Cron presets to lower learning barrier
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-17 — Milestone v2.3 started
 
 ---
 
 ## Session Log
 
-**2026-04-17T01:50:00Z** — Milestone v2.2 Planning
+**2026-04-17** — Milestone v2.3 Started
 
-- Researched Python interactive CLI libraries
-- Compared InquirerPy vs python-inquirer
-- Created 6 requirements (INTERACT-01~06)
-- Created roadmap with 4 plans in 2 waves
-- Updated PROJECT.md with v2.2 goals
+- Target: 邮件通道、飞书通道、channels 交互改进
+- Code version upgrade: 0.1.0 → 0.2.0
+- Feishu implementation needs research
 
 ---
 
