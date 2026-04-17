@@ -29,11 +29,11 @@ Usage:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from claw_cron.channels import MessageResult, get_channel
 from claw_cron.config import load_config
+from claw_cron.template import render as render_template
 
 if TYPE_CHECKING:
     from claw_cron.storage import Task
@@ -87,15 +87,17 @@ class NotifyConfig:
         )
 
 
-def render_message(template: str) -> str:
+def render_message(template: str, context: dict | None = None) -> str:
     """Render message template with variables.
 
     Supported variables:
         {{ date }} -> Current date in YYYY-MM-DD format
         {{ time }} -> Current time in HH:MM:SS format
+        {{ context.KEY }} -> Value from context dict under key KEY
 
     Args:
         template: Message template string.
+        context: Optional context dict for {{ context.xxx }} variables.
 
     Returns:
         Rendered message with variables replaced.
@@ -105,12 +107,7 @@ def render_message(template: str) -> str:
         >>> "{{ date }}" not in msg
         True
     """
-    now = datetime.now()
-    return (
-        template.replace("{{ date }}", now.strftime("%Y-%m-%d")).replace(
-            "{{ time }}", now.strftime("%H:%M:%S")
-        )
-    )
+    return render_template(template, context=context)
 
 
 class Notifier:
