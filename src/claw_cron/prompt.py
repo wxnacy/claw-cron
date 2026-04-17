@@ -24,7 +24,9 @@ def prompt_text(message: str, default: str | None = None) -> str:
     Returns:
         The user's input string.
     """
-    return inquirer.text(message=message, default=default).execute()
+    if default is not None:
+        return inquirer.text(message=message, default=default).execute()
+    return inquirer.text(message=message).execute()
 
 
 def prompt_confirm(message: str, default: bool = True) -> bool:
@@ -51,7 +53,9 @@ def prompt_select(message: str, choices: list[str], default: str | None = None) 
     Returns:
         The selected choice string.
     """
-    return inquirer.select(message=message, choices=choices, default=default).execute()
+    if default is not None:
+        return inquirer.select(message=message, choices=choices, default=default).execute()
+    return inquirer.select(message=message, choices=choices).execute()
 
 
 def prompt_multiselect(message: str, choices: list[str]) -> list[str]:
