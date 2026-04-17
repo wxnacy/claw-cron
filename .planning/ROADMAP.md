@@ -26,7 +26,12 @@
 2. User can see which channels are configured/unconfigured in the `channels add` selection list
 3. User can view detailed configuration status for each channel in `channels list` output
 
-**Plans:** TBD
+**Plans:** 3 plans
+
+**Plan List:**
+- [ ] 11-01-PLAN.md — Channel status functions (get_channel_status, prompt_channel_select)
+- [ ] 11-02-PLAN.md — Interactive channel add command with overwrite confirmation
+- [ ] 11-03-PLAN.md — Enhanced channel list and verify commands
 
 **UI hint:** yes
 
@@ -74,7 +79,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. UX Improvements | 0/0 | Not started | - |
+| 11. UX Improvements | 0/3 | Not started | - |
 | 12. Feishu Channel | 0/0 | Not started | - |
 | 13. Email Channel | 0/0 | Not started | - |
 
