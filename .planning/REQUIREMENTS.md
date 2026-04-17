@@ -1,83 +1,76 @@
-# Requirements: claw-cron v2.4
+# Requirements: claw-cron v3.0
 
 **Defined:** 2026-04-17
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## v2.4 Requirements
+## v3.0 Requirements
 
-### Version
+为 command 类型任务增加双向上下文机制，让脚本可获取系统状态并回传执行结果，实现条件化通知。
 
-- [x] **VERS-01**: 软件版本号升级到 0.2.1
+### Context Injection (系统 → script)
 
-### Architecture
+- [ ] **CTX-01**: 系统环境变量注入 — 执行 command 任务时自动注入 CLAW_TASK_NAME, CLAW_TASK_TYPE, CLAW_LAST_EXIT_CODE, CLAW_LAST_OUTPUT 等系统环境变量到子进程
+- [ ] **CTX-02**: 自定义环境变量注入 — 任务配置中的 `env` 字段（key-value 列表）以 CLAW_CONTEXT_ 前缀注入为环境变量
+- [ ] **CTX-03**: 模板变量注入 — 扩展 `{{ }}` 语法，支持 `{{ context.last_output }}`, `{{ context.signed_in }}` 等上下文变量渲染到 script 字段
+- [ ] **CTX-04**: 上下文文件注入 — 将任务上下文以 JSON 格式写入临时文件，通过 CLAW_CONTEXT_FILE 环境变量传递文件路径给脚本
 
-- [ ] **ARCH-01**: MessageChannel 新增 `supports_capture` 属性标识通道是否支持 capture
-- [ ] **ARCH-02**: MessageChannel 新增 `capture_openid()` 方法，支持通道特定的 capture 实现
-- [ ] **ARCH-03**: QQBotChannel 实现 `capture_openid()` 方法，封装现有 WebSocket 逻辑
-- [ ] **ARCH-04**: FeishuChannel 实现 `capture_openid()` 方法，封装现有 open_id 获取逻辑
+### Context Feedback (script → 系统)
 
-### Capture Enhancement
+- [ ] **CTX-05**: JSON stdout 解析 — 解析 command 任务 stdout 中的 JSON 对象，提取为上下文字典（非 JSON 输出按原逻辑处理）
+- [ ] **CTX-06**: 上下文状态持久化 — 将解析后的上下文保存到任务数据中（`context` 字段），下次执行时可读取
 
-- [ ] **CAPT-01**: capture 命令支持交互式列表选择通道类型（替代 --channel-type 参数）
-- [ ] **CAPT-02**: capture 命令对不支持 capture 的通道给出友好提示
-- [ ] **CAPT-03**: channels add 验证成功后自动询问用户是否执行 capture
-- [ ] **CAPT-04**: capture 流程添加实时状态反馈（Rich console.status）
-- [ ] **CAPT-05**: capture 流程添加 5 分钟超时机制
+### Conditional Notification (条件通知)
 
-### WeChat Channel
+- [ ] **COND-01**: notify when 条件字段 — NotifyConfig 增加 `when` 字段，支持简单表达式如 `signed_in == false`，仅在条件为真时发送通知
+- [ ] **COND-02**: 条件表达式求值 — 支持 `==` 和 `!=` 运算符，对上下文字典中的键值进行判断，支持字符串和布尔值比较
+- [ ] **COND-03**: 无 when 字段时默认行为 — when 为空时保持现有逻辑（始终发送通知），确保向后兼容
 
-- [ ] **WECHAT-01**: 用户可配置企业微信应用凭证 (corp_id, agent_id, secret)
-- [ ] **WECHAT-02**: 用户可通过企业微信应用发送私聊文本消息
-- [ ] **WECHAT-03**: 用户可通过企业微信应用发送私聊 Markdown 消息
-- [ ] **WECHAT-04**: 系统自动管理 access_token 生命周期（获取、缓存、刷新）
-- [ ] **WECHAT-05**: 用户可通过 capture 流程获取企业微信 userid
+### Version (版本)
 
-## v2 Requirements (Deferred)
+- [ ] **VER-01**: 版本号升级到 0.3.0
 
-### WeChat Personal
+## Future Requirements
 
-- **WECHAT-P01**: 支持个人微信消息发送（风险：封号风险高，需监控 iLink API 可用性）
+### Cross-task Context
 
-### WeChat Webhook
+- **XCTX-01**: 任务间上下文共享 — 不同任务可读取其他任务的上下文状态
+- **XCTX-02**: 上下文引用语法 — 类似 `{{ tasks.check_signin.context.signed_in }}` 跨任务引用
 
-- **WECHAT-W01**: 支持企业微信群机器人 Webhook（简单但仅支持群通知）
+### Advanced Conditions
+
+- **ACOND-01**: 复合条件表达式 — 支持 and / or / not 逻辑运算
+- **ACOND-02**: 数值比较 — 支持 >, <, >=, <= 运算符
+- **ACOND-03**: 条件模板 — when 中引用其他任务的上下文
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 个人微信 API | 封号风险极高，需等待微信官方 iLink API 开放申请 |
-| 企业微信群机器人 | 仅支持群广播，不符合私聊通知场景 |
-| 微信图片/文件消息 | 增加复杂度，v2.4 聚焦文本通知 |
-| 多企业微信应用 | 多租户场景，暂无需求 |
-| 微信模板卡片消息 | 需要设计模板结构，复杂度高 |
+| 跨任务上下文共享 | v3.0 仅支持同一任务内上下文传递，跨任务需要调度时序保证，复杂度高 |
+| 复合条件表达式 | and/or/函数调用增加解析复杂度和安全风险，简单 == / != 已覆盖核心场景 |
+| 数值比较运算符 | 核心场景是布尔/字符串判断，数值比较为未来扩展 |
+| 上下文加密 | 单用户本地工具，YAML 文件存储，安全由文件系统权限保证 |
+| 上下文过期机制 | 当前任务量小，无需自动过期清理 |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ARCH-01 | Phase 14 | Pending |
-| ARCH-02 | Phase 14 | Pending |
-| ARCH-03 | Phase 14 | Pending |
-| ARCH-04 | Phase 14 | Pending |
-| CAPT-01 | Phase 15 | Pending |
-| CAPT-02 | Phase 15 | Pending |
-| CAPT-03 | Phase 15 | Pending |
-| CAPT-04 | Phase 15 | Pending |
-| CAPT-05 | Phase 15 | Pending |
-| WECHAT-01 | Phase 16 | Pending |
-| WECHAT-02 | Phase 16 | Pending |
-| WECHAT-03 | Phase 16 | Pending |
-| WECHAT-04 | Phase 16 | Pending |
-| WECHAT-05 | Phase 16 | Pending |
-| VERS-01 | Phase 17 | Complete |
+| CTX-01 | — | Pending |
+| CTX-02 | — | Pending |
+| CTX-03 | — | Pending |
+| CTX-04 | — | Pending |
+| CTX-05 | — | Pending |
+| CTX-06 | — | Pending |
+| COND-01 | — | Pending |
+| COND-02 | — | Pending |
+| COND-03 | — | Pending |
+| VER-01 | — | Pending |
 
 **Coverage:**
-- v2.4 requirements: 15 total
-- Mapped to phases: 15 ✓
-- Unmapped: 0 ✓
+- v3.0 requirements: 10 total
+- Mapped to phases: 0
+- Unmapped: 10 ⚠️
 
 ---
 *Requirements defined: 2026-04-17*
