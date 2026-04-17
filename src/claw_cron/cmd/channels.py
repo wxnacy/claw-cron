@@ -18,6 +18,7 @@ from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, load_contacts, save_contact
 from claw_cron.prompt import prompt_confirm, prompt_channel_select
 from claw_cron.qqbot import GatewayConfig, QQBotWebSocket
+from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
 from claw_cron.channels.qqbot import QQBotConfig
 
 console = Console()
@@ -122,30 +123,58 @@ def add(capture_openid: bool) -> None:
 
 @channels.command("list")
 def list_channels() -> None:
-    """List configured message channels."""
+    """List all registered channels with configuration status."""
     config = load_config()
     channels_config = config.get("channels", {})
-
-    if not channels_config:
-        console.print("[dim]No channels configured.[/dim]")
-        console.print("[dim]Run 'claw-cron channels add' to add one.[/dim]")
-        return
-
-    table = Table(title="Configured Channels")
-    table.add_column("Channel", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("AppID", style="dim")
-    table.add_column("Contacts", style="yellow")
-
     contacts_data = load_contacts()
 
-    for channel_id, cfg in channels_config.items():
-        status = "[green]enabled[/green]" if cfg.get("enabled", True) else "[red]disabled[/red]"
-        app_id = cfg.get("app_id", "N/A")
-        # Count contacts for this channel
+    # Create table with enhanced columns
+    table = Table(title="消息通道")
+    table.add_column("Channel", style="cyan", width=10)
+    table.add_column("Status", width=14)
+    table.add_column("Config", width=16)
+    table.add_column("Contacts", justify="right", width=8)
+    table.add_column("Created", width=10)
+
+    # List all registered channels (not just configured ones)
+    for channel_id in sorted(CHANNEL_REGISTRY.keys()):
+        # Get configuration status
+        icon, status_text = get_channel_status(channel_id)
+
+        # Build status display with color
+        if icon == "✓":
+            status_display = f"[green]{icon} {status_text}[/green]"
+        elif icon == "⚠":
+            status_display = f"[yellow]{icon} {status_text}[/yellow]"
+        elif icon == "✗":
+            status_display = f"[red]{icon} {status_text}[/red]"
+        else:  # ○
+            status_display = f"[dim]{icon} {status_text}[/dim]"
+
+        # Get config display value
+        channel_cfg = channels_config.get(channel_id, {})
+        if channel_id == "qqbot":
+            app_id = channel_cfg.get("app_id", "")
+            config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id) or "-"
+        elif channel_id == "imessage":
+            config_display = "[dim]无需凭证[/dim]"
+        else:
+            config_display = "-"
+
+        # Count contacts
         contact_count = sum(1 for c in contacts_data.values() if c.channel == channel_id)
-        app_id_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id)
-        table.add_row(channel_id, status, app_id_display, str(contact_count))
+
+        # Get created date
+        created_at = channel_cfg.get("created_at", "")
+        created_display = created_at[:10] if created_at else "-"  # Just date part
+
+        table.add_row(
+            channel_id,
+            status_display,
+            config_display,
+            str(contact_count),
+            created_display,
+        )
 
     console.print(table)
 
