@@ -74,6 +74,9 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 | MessageChannel 抽象层 | 可扩展支持更多消息通道，统一发送接口 | — Pending |
 | iMessage 使用 macpymessenger | 现代、类型安全、无需禁用 SIP | — Pending |
 | QQ 使用开放平台 API | 官方支持，稳定性高 | — Pending |
+| 邮件通道使用 aiosmtplib | 异步 SMTP，与项目现有异步架构一致 | — Pending |
+| 飞书通道使用 lark-oapi | 官方 SDK，自动 token 管理，类型安全 | — Pending |
+| 飞书私聊通知 | 类似 QQ Bot 的 open_id 机制，用户需先与机器人交互 | — Pending |
 
 ## Evolution
 
@@ -93,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16 for v2.0 milestone start*
+*Last updated: 2026-04-17 for v2.3 milestone start*
