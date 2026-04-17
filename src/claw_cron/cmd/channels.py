@@ -24,7 +24,7 @@ console = Console()
 CHANNEL_DISPLAY_NAMES = {
     "qqbot": "QQ Bot",
     "feishu": "飞书",
-    "wechat": "企业微信",
+    "wecom": "企业微信",
 }
 
 
@@ -217,6 +217,60 @@ def add() -> None:
         console.print(f"[green]✓ 通道 '{channel_type}' 已启用[/green]")
         console.print("[dim]iMessage 无需配置凭证[/dim]")
 
+    elif channel_type == "wecom":
+        corp_id = click.prompt("Corp ID", type=str)
+        agent_id = click.prompt("Agent ID", type=int)
+        secret = click.prompt("Secret", type=str, hide_input=True)
+
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.get(
+                    "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
+                    params={"corpid": corp_id, "corpsecret": secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+                if data.get("errcode", 0) != 0:
+                    raise click.ClickException(
+                        f"验证失败: {data.get('errmsg', '未知错误')} (errcode={data.get('errcode')})"
+                    )
+                console.print("[green]✓ 凭证验证成功[/green]")
+            except httpx.RequestError as e:
+                raise click.ClickException(f"连接失败: {e}") from e
+
+        if "channels" not in config:
+            config["channels"] = {}
+        config["channels"]["wecom"] = {
+            "corp_id": corp_id,
+            "agent_id": agent_id,
+            "secret": secret,
+            "enabled": True,
+            "created_at": datetime.now().isoformat(),
+        }
+        save_config(config)
+        console.print("[green]✓ 通道 'wecom' 配置完成[/green]")
+
+        if prompt_confirm("是否立即获取用户 ID (capture)?"):
+            _do_wecom_capture(alias="me")
+
+
+def _do_wecom_capture(alias: str) -> None:
+    from claw_cron.channels import get_channel
+    from claw_cron.channels.exceptions import ChannelError
+    ch = get_channel("wecom")
+    try:
+        userid = asyncio.run(ch.capture_openid())
+        console.print(f"[green]✓ UserID 已捕获: [bold]{userid}[/bold][/green]")
+        save_contact(Contact(
+            openid=userid,
+            channel="wecom",
+            alias=alias,
+            created=datetime.now().isoformat(),
+        ))
+        console.print(f"[green]✓ 联系人已保存为 '{alias}'[/green]")
+    except ChannelError as e:
+        console.print(f"[red]Capture 失败: {e}[/red]")
+
 
 @channels.command("list")
 def list_channels() -> None:
@@ -280,7 +334,7 @@ def list_channels() -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom"]))
 @click.option("--force", is_flag=True, help="Skip confirmation")
 def delete(channel_type: str, force: bool) -> None:
     """Delete a channel configuration.
@@ -312,7 +366,7 @@ def delete(channel_type: str, force: bool) -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom"]))
 def verify(channel_type: str) -> None:
     """Verify channel credentials and connectivity.
 
@@ -439,6 +493,30 @@ def verify(channel_type: str) -> None:
             except SystemExit:
                 raise
             except Exception as e:
+                console.print(f"[red]✗ 连接失败: {e}[/red]")
+                raise SystemExit(1)
+
+    elif channel_type == "wecom":
+        wecom_cfg = channels_config["wecom"]
+        corp_id = wecom_cfg.get("corp_id")
+        secret = wecom_cfg.get("secret")
+        if not corp_id or not secret:
+            console.print("[red]✗ 配置不完整：缺少 corp_id 或 secret[/red]")
+            raise SystemExit(1)
+        with console.status("[bold green]正在验证凭证..."):
+            try:
+                response = httpx.get(
+                    "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
+                    params={"corpid": corp_id, "corpsecret": secret},
+                    timeout=10.0,
+                )
+                data = response.json()
+                if data.get("errcode", 0) != 0:
+                    console.print(f"[red]✗ 验证失败: {data.get('errmsg')} (errcode={data.get('errcode')})[/red]")
+                    raise SystemExit(1)
+                console.print("[green]✓ 凭证验证成功[/green]")
+                console.print(f"[dim]Corp ID: {corp_id}[/dim]")
+            except httpx.RequestError as e:
                 console.print(f"[red]✗ 连接失败: {e}[/red]")
                 raise SystemExit(1)
 
