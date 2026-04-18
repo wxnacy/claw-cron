@@ -7,9 +7,9 @@
 
 ### Provider Integration
 
-- [ ] **PROV-01**: 用户可以通过 `--agent` / `-a` 参数选择 AI 后端，默认 codebuddy
-- [ ] **PROV-02**: 用户可以通过 `--model` / `-m` 参数选择模型，默认 minimax-m2.5
-- [ ] **PROV-03**: 新增 CodebuddyProvider 实现 BaseProvider 接口，支持 Codebuddy SDK 调用
+- [x] **PROV-01**: 用户可以通过 `--agent` / `-a` 参数选择 AI 后端，默认 codebuddy
+- [x] **PROV-02**: 用户可以通过 `--model` / `-m` 参数选择模型，默认 minimax-m2.5
+- [x] **PROV-03**: 新增 CodebuddyProvider 实现 BaseProvider 接口，支持 Codebuddy SDK 调用
 
 ### Custom Tools
 
@@ -28,7 +28,7 @@
 ### UX
 
 - [ ] **UX-01**: Chat 对话显示每轮 tokens 消耗（输入、输出、缓存）
-- [ ] **UX-02**: CODEBUDDY_API_KEY 缺失时友好提示，不抛异常
+- [x] **UX-02**: CODEBUDDY_API_KEY 缺失时友好提示，不抛异常
 - [ ] **UX-03**: 版本升级到 0.3.3
 
 ## v2 Requirements (Deferred)
@@ -60,9 +60,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 22 | Pending |
-| PROV-02 | Phase 22 | Pending |
-| PROV-03 | Phase 22 | Pending |
+| PROV-01 | Phase 22 | Complete |
+| PROV-02 | Phase 22 | Complete |
+| PROV-03 | Phase 22 | Complete |
 | TOOL-01 | Phase 23 | Pending |
 | TOOL-02 | Phase 23 | Pending |
 | TOOL-03 | Phase 23 | Pending |
@@ -72,7 +72,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-01 | Phase 24 | Pending |
 | SESS-02 | Phase 24 | Pending |
 | UX-01 | Phase 24 | Pending |
-| UX-02 | Phase 22 | Pending |
+| UX-02 | Phase 22 | Complete |
 | UX-03 | Phase 25 | Pending |
 
 **Coverage:**

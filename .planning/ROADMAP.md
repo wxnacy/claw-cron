@@ -39,7 +39,7 @@
 4. API Key missing shows friendly message instead of throwing exception
 5. Provider factory returns correct provider based on `--agent` parameter
 
-**Plans:** 0/1 plans complete
+**Plans:** 1/1 plans complete
 
 #### Phase 23: Custom Tools
 **Goal:** 将内置方法集成为 Agent 自定义工具
@@ -97,7 +97,7 @@ Phase 22 → Phase 23 → Phase 24 → Phase 25
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 22. Codebuddy Provider | v3.2 | 0/1 | Pending | — |
+| 22. Codebuddy Provider | v3.2 | 1/1 | Complete    | 2026-04-18 |
 | 23. Custom Tools | v3.2 | 0/1 | Pending | — |
 | 24. Session & Token | v3.2 | 0/1 | Pending | — |
 | 25. Progressive Tools & Release | v3.2 | 0/1 | Pending | — |
