@@ -8,14 +8,18 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 
 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## Current Milestone: v3.1 Update 命令
+## Current Milestone: v3.2 Codebuddy Agent 集成
 
-**Goal:** 增加 update 命令，支持修改已有任务的字段，版本升级到 0.3.1
+**Goal:** 将 chat 命令迁移到 Codebuddy SDK，支持多模型选择，集成内置工具为 Agent Tools
 
 **Target features:**
-- 增加 `update` 子命令，必传 `name` 参数定位任务
-- 支持修改字段：cron、enabled、message、script、prompt
-- 版本号升级到 0.3.1
+- chat 命令增加 `--agent` / `-a` 参数，默认使用 codebuddy
+- chat 命令增加 `--model` / `-m` 参数选择模型
+- 将 list/command/context/delete/remind/update 内置方法集成到自定义工具
+- 内置工具使用渐进式批量模式
+- agent 对话日志按 session 单独保存
+- chat 对话显示每轮 tokens 消耗
+- 版本升级到 0.3.3
 
 ## Requirements
 
@@ -42,15 +46,19 @@ claw-cron 是一个结合 AI Agent 的智能定时任务系统。用户可以通
 - ✅ **v3.0 里程碑已完成** (2026-04-18)
   - Command 上下文机制 (Phase 18-20)
 
-### Active (v3.1)
+- ✅ **v3.1 里程碑已完成** (2026-04-19)
+  - Update 命令 (Phase 21)
 
-- [ ] update 子命令，必传 name 参数
-- [ ] 支持修改 cron 字段
-- [ ] 支持修改 enabled 字段
-- [ ] 支持修改 message 字段
-- [ ] 支持修改 script 字段
-- [ ] 支持修改 prompt 字段
-- [ ] 版本升级到 0.3.1
+### Active (v3.2)
+
+- [ ] chat 命令增加 `--agent` / `-a` 参数，默认使用 codebuddy
+- [ ] chat 命令增加 `--model` / `-m` 参数选择模型，默认 minimax-m2.5
+- [ ] 将内置方法 (list/command/context/delete/remind/update) 集成到 Agent 自定义工具
+- [ ] 内置工具使用渐进式批量模式（系统提示词给名称描述，agent 按需获取）
+- [ ] agent 对话日志按 session 单独保存
+- [ ] chat 对话显示每轮 tokens 消耗（输出、输入、缓存）
+- [ ] CODEBUDDY_API_KEY 缺失时友好提示，不抛异常
+- [ ] 版本升级到 0.3.3
 
 ### Out of Scope
 
@@ -113,4 +121,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-18 for v3.1 milestone start*
+*Last updated: 2026-04-19 for v3.2 milestone start*

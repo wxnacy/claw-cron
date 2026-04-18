@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.1
-milestone_name: Update 命令
-status: completed
-stopped_at: Roadmap created for v3.1 milestone
-last_updated: "2026-04-17T17:11:58.391Z"
-last_activity: 2026-04-17
+milestone: v3.2
+milestone_name: Codebuddy Agent 集成
+status: started
+stopped_at: Milestone initialized
+last_updated: "2026-04-19T00:00:00.000Z"
+last_activity: 2026-04-19
 progress:
-  total_phases: 8
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-18)
+See: .planning/PROJECT.md (updated 2026-04-19)
 
 **Core value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
-**Current focus:** Phase 21 — Update Command & Release
+**Current focus:** Defining requirements for v3.2
 
 ## Current Position
 
-Phase: 21 of 21 (Update Command & Release)
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-04-18 - Completed quick task 260418-mq9: 整理代码改动，记录到 planning 并提交
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-19 — Milestone v3.2 started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -36,22 +36,9 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 14 (across v1.0–v3.0)
+- Total plans completed: 15 (across v1.0–v3.1)
 - Average duration: —
 - Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 14 | 1 | — | — |
-| 15 | 1 | — | — |
-| 16 | 1 | — | — |
-| 17 | 2 | — | — |
-| 18 | 1 | — | — |
-| 19 | 3 | — | — |
-| 20 | 1 | — | — |
-| 21 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -67,7 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Phase 20]: Conditional notification with when field — only sends when expression evaluates true
+- [Phase 21]: Update command for task modification
 
 ### Pending Todos
 
@@ -97,6 +84,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-18
-Stopped at: Roadmap created for v3.1 milestone
+Last session: 2026-04-19
+Stopped at: Milestone initialized
 Resume file: None
