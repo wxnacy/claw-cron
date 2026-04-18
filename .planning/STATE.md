@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v3.2
 milestone_name: Codebuddy Agent 集成
-status: started
-stopped_at: Milestone initialized
-last_updated: "2026-04-19T00:00:00.000Z"
-last_activity: 2026-04-19
+status: Defining requirements
+stopped_at: Phase 22 context gathered
+last_updated: "2026-04-18T18:09:34.297Z"
+last_activity: 2026-04-19 — Milestone v3.2 started
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -84,6 +84,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-19
-Stopped at: Milestone initialized
-Resume file: None
+Last session: 2026-04-18T18:09:34.294Z
+Stopped at: Phase 22 context gathered
+Resume file: .planning/phases/22-codebuddy-provider/22-CONTEXT.md
