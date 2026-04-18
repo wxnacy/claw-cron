@@ -168,11 +168,10 @@ def _update_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
     selected_fields: list[str] = inquirer.checkbox(
         message="选择要修改的字段:",
         choices=field_choices,
+        instruction="(空格选中/取消，↑↓移动，回车确认)",
+        validate=lambda result: len(result) > 0,
+        invalid_message="请至少选择一个字段",
     ).execute()
-
-    if not selected_fields:
-        console.print("[dim]未选择任何字段，退出。[/dim]")
-        return
 
     scalar_updates: dict = {}
 
@@ -279,6 +278,9 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
                     Choice(value="recipient", name=f"recipient  (当前: {', '.join(cfg.recipients)})"),
                     Choice(value="when",      name=f"when       (当前: {cfg.when or 'null'})"),
                 ],
+                instruction="(空格选中/取消，回车确认)",
+                validate=lambda result: len(result) > 0,
+                invalid_message="请至少选择一项",
             ).execute()
 
             new_recipients = None
