@@ -81,7 +81,7 @@ None yet.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260418-iyg | system channel & multi-notify support | 2026-04-18 | — | [260418-iyg-system-channel-multi-notify-support](./quick/260418-iyg-system-channel-multi-notify-support/) |
+| 260418-iyg | system channel & multi-notify support | 2026-04-18 | 6fe96fa | [260418-iyg-system-channel-multi-notify-support](./quick/260418-iyg-system-channel-multi-notify-support/) |
 
 ## Deferred Items
 
