@@ -1,57 +1,85 @@
-# Requirements: claw-cron v3.1
+# Requirements: claw-cron v3.2
 
-**Defined:** 2026-04-18
+**Defined:** 2026-04-19
 **Core Value:** 用自然语言描述定时任务，AI 帮你配置并按时执行，并通过消息通道通知你。
 
-## v3.1 Requirements
+## v1 Requirements (Current Milestone)
 
-增加 update 命令，支持修改已有任务的字段，版本升级到 0.3.1。
+### Provider Integration
 
-### Update Command (任务修改)
+- [ ] **PROV-01**: 用户可以通过 `--agent` / `-a` 参数选择 AI 后端，默认 codebuddy
+- [ ] **PROV-02**: 用户可以通过 `--model` / `-m` 参数选择模型，默认 minimax-m2.5
+- [ ] **PROV-03**: 新增 CodebuddyProvider 实现 BaseProvider 接口，支持 Codebuddy SDK 调用
 
-- [x] **UPD-01**: update 子命令入口 — 用户可通过 `claw-cron update <name>` 调用，name 为必传参数定位目标任务
-- [x] **UPD-02**: 修改 cron 字段 — 通过 `--cron` 选项修改任务的 cron 表达式
-- [x] **UPD-03**: 修改 enabled 字段 — 通过 `--enabled` 选项启用/禁用任务（布尔值）
-- [x] **UPD-04**: 修改 message 字段 — 通过 `--message` 选项修改通知消息模板
-- [x] **UPD-05**: 修改 script 字段 — 通过 `--script` 选项修改 command 类型任务的脚本内容
-- [x] **UPD-06**: 修改 prompt 字段 — 通过 `--prompt` 选项修改 chat 类型任务的 prompt 内容
+### Custom Tools
 
-### Version (版本)
+- [ ] **TOOL-01**: 将 list_tasks 方法集成为 Agent 自定义工具
+- [ ] **TOOL-02**: 将 add_task 方法集成为 Agent 自定义工具
+- [ ] **TOOL-03**: 将 update_task 方法集成为 Agent 自定义工具
+- [ ] **TOOL-04**: 将 delete_task 方法集成为 Agent 自定义工具
+- [ ] **TOOL-05**: 将 run_task 方法集成为 Agent 自定义工具
+- [ ] **TOOL-06**: 内置工具使用渐进式批量模式（系统提示词给名称描述，agent 按需获取详情）
 
-- [x] **VER-02**: 版本号升级到 0.3.1
+### Session Management
 
-## Future Requirements
+- [ ] **SESS-01**: Agent 对话日志按 session 单独保存到 `~/.config/claw-cron/sessions/{session_id}.jsonl`
+- [ ] **SESS-02**: 支持从历史 session 恢复对话
 
-### Batch Update
+### UX
 
-- **BUPD-01**: 批量修改 — 支持同时修改多个任务的相同字段
-- **BUPD-02**: 按条件批量修改 — 按 cron 模式或类型筛选后批量修改
+- [ ] **UX-01**: Chat 对话显示每轮 tokens 消耗（输入、输出、缓存）
+- [ ] **UX-02**: CODEBUDDY_API_KEY 缺失时友好提示，不抛异常
+- [ ] **UX-03**: 版本升级到 0.3.3
+
+## v2 Requirements (Deferred)
+
+### Advanced Features
+
+- **ADV-01**: 支持提醒任务（remind_task）工具
+- **ADV-02**: 支持上下文命令（context）工具
+- **ADV-03**: 支持 tool calling 失败时的降级策略
+
+### Integration
+
+- **INT-01**: 支持从现有 chat.py 历史导入对话
+- **INT-02**: 支持配置默认 agent 和 model
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| 修改任务类型 | 类型变更涉及配置结构变化，应删除重建 |
-| 修改任务名称 | 名称为主键，变更影响上下文文件路径等关联数据，应删除重建 |
-| 修改通知通道 | 通道配置结构复杂，未来单独处理 |
-| 修改环境变量/上下文配置 | env/context 属于高级配置，v3.1 聚焦常用字段 |
+| Web UI | CLI 优先 |
+| 多用户/权限管理 | 单用户本地工具 |
+| 外部 MCP 服务器 | Custom Tools 已足够，无需额外进程 |
+| 完全替代现有 Provider 层 | 保持向后兼容，逐步迁移 |
+| 系统 crontab 集成 | 项目自管理调度 |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UPD-01 | Phase 21 | Complete |
-| UPD-02 | Phase 21 | Complete |
-| UPD-03 | Phase 21 | Complete |
-| UPD-04 | Phase 21 | Complete |
-| UPD-05 | Phase 21 | Complete |
-| UPD-06 | Phase 21 | Complete |
-| VER-02 | Phase 21 | Complete |
+| PROV-01 | Phase 22 | Pending |
+| PROV-02 | Phase 22 | Pending |
+| PROV-03 | Phase 22 | Pending |
+| TOOL-01 | Phase 23 | Pending |
+| TOOL-02 | Phase 23 | Pending |
+| TOOL-03 | Phase 23 | Pending |
+| TOOL-04 | Phase 23 | Pending |
+| TOOL-05 | Phase 23 | Pending |
+| TOOL-06 | Phase 25 | Pending |
+| SESS-01 | Phase 24 | Pending |
+| SESS-02 | Phase 24 | Pending |
+| UX-01 | Phase 24 | Pending |
+| UX-02 | Phase 22 | Pending |
+| UX-03 | Phase 25 | Pending |
 
 **Coverage:**
-- v3.1 requirements: 7 total
-- Mapped to phases: 7 ✓
-- Unmapped: 0
+- v1 requirements: 14 total
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-04-18*
+*Requirements defined: 2026-04-19*
+*Last updated: 2026-04-19 after initial definition*
