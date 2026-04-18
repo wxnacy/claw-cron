@@ -105,3 +105,34 @@ def to_openai_tool(tool: ToolDefinition) -> dict[str, Any]:
             "parameters": tool.parameters,
         },
     }
+
+
+def to_codebuddy_tool(tool: ToolDefinition) -> dict[str, Any]:
+    """Convert ToolDefinition to Codebuddy SDK tool format.
+
+    Codebuddy SDK uses simple type mapping or JSON Schema for parameters.
+    This function preserves the JSON Schema format from ToolDefinition.
+
+    Args:
+        tool: Provider-agnostic tool definition.
+
+    Returns:
+        Dictionary compatible with Codebuddy SDK @tool decorator.
+
+    Example:
+        >>> tool = ToolDefinition(
+        ...     name="create_task",
+        ...     description="Create a scheduled task",
+        ...     parameters={"type": "object", "properties": {"name": {"type": "string"}}}
+        ... )
+        >>> cb_tool = to_codebuddy_tool(tool)
+        >>> cb_tool["name"]
+        'create_task'
+        >>> "parameters" in cb_tool
+        True
+    """
+    return {
+        "name": tool.name,
+        "description": tool.description,
+        "parameters": tool.parameters,
+    }
