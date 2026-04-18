@@ -33,8 +33,8 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 | `claw-cron add` | Add a new scheduled task |
 | `claw-cron command` | Create a command-type task (supports interactive mode) |
 | `claw-cron list` | List all tasks |
-| `claw-cron update <name>` | Update fields of an existing task (`--cron`, `--enabled`, `--message`, `--script`, `--prompt`) |
-| `claw-cron delete <name>` | Delete a task |
+| `claw-cron update <name>` | Update fields of an existing task (`--cron`, `--enabled`, `--message`, `--script`, `--prompt`, notify options); omit all options for interactive mode |
+| `claw-cron delete <name>` | Delete a task (`-y` to skip confirmation) |
 | `claw-cron run <name>` | Execute a task immediately |
 | `claw-cron log <name>` | View execution logs |
 | `claw-cron remind` | Create a reminder (supports interactive mode) |
@@ -56,7 +56,25 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 
 ## Notification Channels
 
-`imessage`, `qqbot`
+| Channel | Description | Recipient Format |
+|---------|-------------|-----------------|
+| `system` | macOS desktop notification (default, no config needed) | `local` |
+| `imessage` | iMessage | `+8613812345678` |
+| `qqbot` | QQ Bot | `c2c:OPENID` / `group:GROUP_ID` |
+| `wecom` | 企业微信 | openid |
+| `feishu` | 飞书 | openid |
+| `email` | Email | email address |
+
+Tasks default to `system` channel. Multiple channels supported per task:
+
+```yaml
+notify:
+  - channel: system
+    recipients: [local]
+  - channel: qqbot
+    recipients: [c2c:OPENID]
+    when: "signed_in == false"
+```
 
 ## Template Variables
 
@@ -148,7 +166,44 @@ success = do_signin()
 print(json.dumps({"signed_in": success}))
 ```
 
-## Cron Expression
+## Update Command
+
+```bash
+# Interactive mode (no options)
+claw-cron update <name>
+
+# Scalar fields
+claw-cron update <name> --cron "0 9 * * *"
+claw-cron update <name> --enabled false
+claw-cron update <name> --script "new_script.sh"
+
+# Notify: add channel
+claw-cron update <name> --notify-add system
+claw-cron update <name> --notify-add qqbot --notify-recipient c2c:XXX
+claw-cron update <name> --notify-add qqbot --notify-recipient c2c:XXX --notify-when "signed_in == false"
+
+# Notify: remove channel
+claw-cron update <name> --notify-remove qqbot
+
+# Notify: modify existing channel
+claw-cron update <name> --notify-channel qqbot --notify-recipient c2c:NEW
+claw-cron update <name> --notify-channel qqbot --notify-when "signed_in == false"
+claw-cron update <name> --notify-channel qqbot --notify-when ""   # clear condition
+
+# Notify: clear all
+claw-cron update <name> --notify-clear
+```
+
+Interactive mode uses a `select` loop — pick a field, edit it, repeat, then choose "完成" to exit.
+
+## Delete Command
+
+```bash
+claw-cron delete <name>        # prompts for confirmation
+claw-cron delete <name> -y     # skip confirmation (for scripts)
+```
+
+
 
 5-field format: `minute hour day month weekday`
 
@@ -216,16 +271,16 @@ claw-cron add --name weekly-report --cron "0 17 * * 5" \
 ### Interactive Command Creation
 
 ```bash
-# Interactive mode - guided prompts
+# Interactive mode - guided prompts (defaults to system channel notification)
 claw-cron command
 
-# The wizard will guide you through:
-# 1. Task name
-# 2. Cron schedule (with preset options)
-# 3. Shell command
-# 4. Optional notification setup
+# Direct mode — system notification by default
+claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
 
-# Direct mode with notification
+# Disable notification
+claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh" --no-notify
+
+# With QQ Bot notification
 claw-cron command --name health-check --cron "*/30 * * * *" \
     --script "curl -s https://api.example.com/health" \
     --channel qqbot --recipient me
@@ -250,10 +305,14 @@ claw-cron add --name monthly-review --cron "0 10 1 * *" \
 ### Reminders
 
 ```bash
-# Interactive reminder creation
+# Interactive reminder creation (system channel available by default, no pre-config needed)
 claw-cron remind
 
-# Daily standup reminder at 9am via iMessage
+# Direct mode — system notification by default
+claw-cron remind --name standup --cron "0 9 * * *" \
+    --message "Daily standup at {{ time }}"
+
+# With iMessage
 claw-cron remind --name standup --cron "0 9 * * *" \
     --message "Daily standup meeting starting at {{ time }}" \
     --channel imessage --recipient "+8613812345678"
@@ -262,21 +321,6 @@ claw-cron remind --name standup --cron "0 9 * * *" \
 claw-cron remind --name weekly-meeting --cron "0 14 * * 1" \
     --message "Weekly sync meeting in 10 minutes" \
     --channel qqbot --recipient "group:123456"
-
-# Lunch reminder every weekday at noon
-claw-cron remind --name lunch --cron "0 12 * * 1-5" \
-    --message "Time for lunch break!" \
-    --channel imessage --recipient "+8613812345678"
-
-# Birthday reminder (yearly on specific date)
-claw-cron remind --name birthday --cron "0 9 15 6 *" \
-    --message "Today is someone's birthday!" \
-    --channel qqbot --recipient "group:123456"
-
-# Multiple times daily (8am, 12pm, 6pm)
-claw-cron remind --name take-medicine --cron "0 8,12,18 * * *" \
-    --message "Time to take medicine" \
-    --channel imessage --recipient "+8613812345678"
 ```
 
 ## Data Storage
