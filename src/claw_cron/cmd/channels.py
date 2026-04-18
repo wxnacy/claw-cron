@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.table import Table
 
 from claw_cron.config import load_config, save_config
-from claw_cron.contacts import Contact, load_contacts, save_contact
+from claw_cron.contacts import Contact, contact_key, load_contacts, save_contact
 from claw_cron.prompt import prompt_confirm, prompt_channel_select, prompt_capture_channel_select
 from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
 
@@ -611,14 +611,14 @@ def list_contacts() -> None:
     table.add_column("OpenID", style="dim")
     table.add_column("Created", style="dim")
 
-    for alias, contact in contact_list.items():
+    for key, contact in contact_list.items():
         openid_display = (
             f"{contact.openid[:16]}..."
             if len(contact.openid) > 16
             else contact.openid
         )
         table.add_row(
-            alias,
+            contact.alias,
             contact.channel,
             openid_display,
             contact.created[:10],  # Just date
@@ -628,18 +628,41 @@ def list_contacts() -> None:
 
 @contacts.command()
 @click.argument("alias")
+@click.option("--channel", default=None, help="Channel type to disambiguate (e.g., qqbot, wecom)")
 @click.option("--force", is_flag=True, help="Skip confirmation")
-def delete(alias: str, force: bool) -> None:
+def delete(alias: str, channel: str | None, force: bool) -> None:
     """Delete a contact by alias.
 
     ALIAS is the contact alias to delete.
+    Use --channel to specify which channel when the same alias exists under multiple channels.
     """
     contacts_data = load_contacts()
-    if alias not in contacts_data:
+
+    # Find all contacts matching the alias
+    matching = {k: c for k, c in contacts_data.items() if c.alias == alias}
+
+    if not matching:
         console.print(f"[yellow]Contact '{alias}' not found.[/yellow]")
         return
 
-    if not force and not prompt_confirm(f"Delete contact '{alias}'?"):
+    # If multiple matches and no --channel specified, ask user to disambiguate
+    if len(matching) > 1 and channel is None:
+        channels = [c.channel for c in matching.values()]
+        console.print(f"[yellow]Contact '{alias}' exists under multiple channels: {channels}[/yellow]")
+        console.print("[dim]Use --channel to specify which one to delete.[/dim]")
+        return
+
+    # Determine the key to delete
+    if channel:
+        key = contact_key(channel, alias)
+        if key not in contacts_data:
+            console.print(f"[yellow]Contact '{alias}' not found under channel '{channel}'.[/yellow]")
+            return
+    else:
+        key = next(iter(matching))
+        channel = matching[key].channel
+
+    if not force and not prompt_confirm(f"Delete contact '{alias}' (channel: {channel})?"):
         return
 
     # Load YAML file and remove contact
@@ -652,12 +675,12 @@ def delete(alias: str, force: bool) -> None:
     if contacts_file.exists():
         with contacts_file.open() as f:
             data = yaml.safe_load(f) or {}
-        if "contacts" in data and alias in data["contacts"]:
-            del data["contacts"][alias]
+        if "contacts" in data and key in data["contacts"]:
+            del data["contacts"][key]
             with contacts_file.open("w") as f:
                 yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
 
-    console.print(f"[green]Contact '{alias}' deleted.[/green]")
+    console.print(f"[green]Contact '{alias}' (channel: {channel}) deleted.[/green]")
 
 
 # Register contacts as subcommand of channels

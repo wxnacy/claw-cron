@@ -155,7 +155,7 @@ def _command_interactive(
             # Select recipient
             contacts_data = load_contacts()
             channel_contacts = {
-                alias: c for alias, c in contacts_data.items()
+                c.alias: c for c in contacts_data.values()
                 if c.channel == selected_channel
             }
 

@@ -54,7 +54,7 @@ def _remind_interactive() -> None:
     # 5. Select recipient
     contacts_data = load_contacts()
     channel_contacts = {
-        alias: c for alias, c in contacts_data.items()
+        c.alias: c for c in contacts_data.values()
         if c.channel == channel
     }
 

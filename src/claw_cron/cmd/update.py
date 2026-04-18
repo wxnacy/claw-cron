@@ -322,7 +322,7 @@ def _prompt_recipients(channel: str, current: list[str] | None = None) -> list[s
 
     contacts_data = load_contacts()
     channel_contacts = {
-        alias: c for alias, c in contacts_data.items() if c.channel == channel
+        c.alias: c for c in contacts_data.values() if c.channel == channel
     }
 
     if channel_contacts:

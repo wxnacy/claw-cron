@@ -29,6 +29,14 @@
 - `src/claw_cron/__about__.py:__version__` 升级到 "0.3.1"
 - 增加 update 命令，必传路径参数为 `name`，支持修改的字段 cron/enabled/message/script/prompt
 
+### 0.3.2
+
+- `src/claw_cron/__about__.py:__version__` 升级到 "0.3.2"
+- 修改 contacts 保存方式
+    - 如果通道进行 capture 时，alias 没有修改，会覆盖掉其他通道的联系人
+    - 应该允许，不同频道有相同联系人名称的存在
+- 检查所有用到 contacts 的地方，修改读取和写入操作
+
 ## TODO
 
 - [x] 参照 `~/Projects/mlx-cli/Makefile` 创建 Makefile
