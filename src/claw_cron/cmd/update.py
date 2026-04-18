@@ -145,7 +145,6 @@ def update(
 
 def _update_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def]
     from InquirerPy import inquirer
-    from InquirerPy.base.control import Choice
 
     from claw_cron.prompt import prompt_cron, prompt_text
 
@@ -156,24 +155,27 @@ def _update_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
 
     notify_summary = _notify_summary(task)
 
-    field_choices = [
-        Choice(value="cron",    name=f"cron     [{_short(task.cron)}]"),
-        Choice(value="enabled", name=f"enabled  [{task.enabled}]"),
-        Choice(value="message", name=f"message  [{_short(task.message)}]"),
-        Choice(value="script",  name=f"script   [{_short(task.script)}]"),
-        Choice(value="prompt",  name=f"prompt   [{_short(task.prompt)}]"),
-        Choice(value="notify",  name=f"notify   [{notify_summary}]"),
-    ]
+    # Use plain strings for checkbox — Choice objects cause keybinding issues in some terminals
+    field_map = {
+        f"cron     [{_short(task.cron)}]":    "cron",
+        f"enabled  [{task.enabled}]":          "enabled",
+        f"message  [{_short(task.message)}]":  "message",
+        f"script   [{_short(task.script)}]":   "script",
+        f"prompt   [{_short(task.prompt)}]":   "prompt",
+        f"notify   [{notify_summary}]":        "notify",
+    }
 
     while True:
-        selected_fields: list[str] = inquirer.checkbox(
+        selected_labels: list[str] = inquirer.checkbox(
             message="选择要修改的字段:",
-            choices=field_choices,
+            choices=list(field_map.keys()),
             instruction="(空格选中/取消，↑↓移动，回车确认)",
         ).execute()
-        if selected_fields:
+        if selected_labels:
             break
         console.print("[yellow]请至少选择一个字段[/yellow]")
+
+    selected_fields = [field_map[label] for label in selected_labels]
 
     scalar_updates: dict = {}
 
@@ -274,17 +276,19 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
             ).execute()
             cfg = next(c for c in configs if c.channel == channel)
 
-            what = inquirer.checkbox(
+            edit_map = {
+                f"recipient  [{', '.join(cfg.recipients)}]": "recipient",
+                f"when       [{cfg.when or 'null'}]":        "when",
+            }
+            what_labels = inquirer.checkbox(
                 message=f"修改 {channel} 的哪些项:",
-                choices=[
-                    Choice(value="recipient", name=f"recipient  [{', '.join(cfg.recipients)}]"),
-                    Choice(value="when",      name=f"when       [{cfg.when or 'null'}]"),
-                ],
+                choices=list(edit_map.keys()),
                 instruction="(空格选中/取消，回车确认)",
             ).execute()
-            if not what:
+            if not what_labels:
                 console.print("[yellow]未选择任何项，跳过[/yellow]")
                 continue
+            what = [edit_map[l] for l in what_labels]
 
             new_recipients = None
             new_when = None
