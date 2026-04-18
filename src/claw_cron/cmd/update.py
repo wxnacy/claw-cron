@@ -215,7 +215,7 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
     from InquirerPy.base.control import Choice
 
     from claw_cron.contacts import load_contacts
-    from claw_cron.prompt import prompt_channel_select, prompt_text
+    from claw_cron.prompt import prompt_text
 
     while True:
         configs = get_notify_list(get_task(name))  # type: ignore[arg-type]
@@ -241,8 +241,18 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
             console.print("  [dim]已清空所有通知配置[/dim]")
 
         elif action == "add":
-            channel = prompt_channel_select()
-            if any(c.channel == channel for c in configs):
+            existing = {c.channel for c in configs}
+            from claw_cron.channels import CHANNEL_REGISTRY
+            channel_choices = [
+                f"{ch} {'[已添加]' if ch in existing else ''}"
+                for ch in sorted(CHANNEL_REGISTRY.keys())
+            ]
+            selected_label: str = inquirer.select(
+                message="选择要添加的渠道:",
+                choices=channel_choices,
+            ).execute()
+            channel = selected_label.split()[0]
+            if channel in existing:
                 console.print(f"[yellow]'{channel}' 已存在，请用「修改渠道」[/yellow]")
                 continue
             recipients = _prompt_recipients(channel)
