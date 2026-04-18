@@ -15,14 +15,18 @@ console = Console()
 
 @click.command()
 @click.argument("name")
-def delete(name: str) -> None:
-    """Delete a scheduled task by NAME."""
+@click.option("-y", "--yes", is_flag=True, help="Skip confirmation prompt")
+def delete(name: str, yes: bool) -> None:
+    """Delete a scheduled task by NAME.
+
+    Use -y to skip confirmation.
+    """
     task = get_task(name)
     if task is None:
         console.print(f"[red]Task '{name}' not found.[/red]")
         raise SystemExit(1)
 
-    if not prompt_confirm(f"Delete task '{name}'?"):
+    if not yes and not prompt_confirm(f"Delete task '{name}'?"):
         console.print("[dim]Cancelled.[/dim]")
         raise SystemExit(0)
     delete_task(name)

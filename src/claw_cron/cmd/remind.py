@@ -37,17 +37,19 @@ def _remind_interactive() -> None:
     # 4. Select notification channel
     config = load_config()
     channels_config = config.get("channels", {})
-    if not channels_config:
-        console.print("[red]未配置通知通道。请先运行 'claw-cron channels add'[/red]")
-        raise SystemExit(1)
 
+    # Include system channel as default option
     available_channels = list(channels_config.keys())
+    if "system" not in available_channels:
+        available_channels.insert(0, "system")
+
     if len(available_channels) == 1:
         channel = available_channels[0]
         console.print(f"[dim]使用通道: {channel}[/dim]")
     else:
         console.print("\n[bold]选择通知通道:[/bold]")
-        channel = prompt_select("通道", choices=available_channels)
+        # Default to system channel
+        channel = prompt_select("通道", choices=available_channels, default="system")
 
     # 5. Select recipient
     contacts_data = load_contacts()
@@ -119,12 +121,12 @@ def _remind_interactive() -> None:
     "--message", default=None, help="Reminder message (supports {{ date }}, {{ time }})"
 )
 @click.option(
-    "--channel", default=None, help="Notification channel (imessage, qqbot)"
+    "--channel", default="system", help="Notification channel (system, imessage, qqbot)"
 )
 @click.option(
     "--recipient",
     "recipients",
-    default=None,
+    default=("local",),
     multiple=True,
     help="Notification recipient (openid, 'c2c:OPENID', 'group:OPENID', or contact alias)",
 )
@@ -170,7 +172,7 @@ def remind(
         claw-cron remind
     """
     # Check if entering interactive mode
-    if not all([name, cron, message, channel, recipients]):
+    if not all([name, cron, message]):
         return _remind_interactive()
 
     # Direct mode: proceed with provided arguments

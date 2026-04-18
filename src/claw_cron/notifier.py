@@ -44,12 +44,13 @@ class NotifyConfig:
     """Notification configuration for a task.
 
     Attributes:
-        channel: Channel identifier ('imessage', 'qqbot', etc.).
+        channel: Channel identifier ('imessage', 'qqbot', 'system', etc.).
             Must match a registered channel in CHANNEL_REGISTRY.
         recipients: List of recipient identifiers.
             Format depends on channel:
             - iMessage: Phone numbers with country code ('+8613812345678')
             - QQ Bot: C2C ('c2c:OPENID') or group ('group:GROUP_ID')
+            - System: Use 'local' (ignored, notification shows locally)
         when: Condition expression for notification delivery (e.g. 'signed_in == false').
             When None, notification is always sent. Evaluated in Phase 20.
 
@@ -65,14 +66,17 @@ class NotifyConfig:
     when: str | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> NotifyConfig:
+    def from_dict(cls, data: dict[str, Any]) -> NotifyConfig | list[NotifyConfig]:
         """Create NotifyConfig from a dictionary.
 
+        Supports both single notify config and list of configs.
+
         Args:
-            data: Dictionary with 'channel' and 'recipients' keys.
+            data: Dictionary with 'channel' and 'recipients' keys,
+                or a list of such dictionaries.
 
         Returns:
-            NotifyConfig instance.
+            NotifyConfig instance or list of NotifyConfig instances.
 
         Example:
             >>> config = NotifyConfig.from_dict({
@@ -85,6 +89,27 @@ class NotifyConfig:
             recipients=data.get("recipients", []),
             when=data.get("when"),
         )
+
+    @classmethod
+    def from_dict_list(cls, data: dict[str, Any] | list[dict[str, Any]]) -> list[NotifyConfig]:
+        """Create list of NotifyConfig from dict or list of dicts.
+
+        Args:
+            data: Single notify dict or list of notify dicts.
+
+        Returns:
+            List of NotifyConfig instances.
+
+        Example:
+            >>> configs = NotifyConfig.from_dict_list([
+            ...     {"channel": "qqbot", "recipients": ["c2c:ABC123"]},
+            ...     {"channel": "system", "recipients": ["local"]}
+            ... ])
+        """
+        if isinstance(data, list):
+            return [cls.from_dict(item) for item in data]
+        else:
+            return [cls.from_dict(data)]
 
 
 def render_message(template: str, context: dict | None = None) -> str:
@@ -135,47 +160,56 @@ class Notifier:
     ) -> list[MessageResult]:
         """Send notification after task execution.
 
+        Supports multiple notification channels (notify can be a list).
+
         Args:
             task: Task that was executed.
             exit_code: Exit code from task execution (0 = success).
             output: Optional output from task execution.
 
         Returns:
-            List of MessageResult for each recipient.
+            List of MessageResult for each recipient across all channels.
             Empty list if task has no notify config.
         """
         if not task.notify:
             return []
 
-        # Load channel config from config.yaml
+        # Normalize to list
+        notify_configs: list[NotifyConfig] = []
+        if isinstance(task.notify, list):
+            notify_configs = task.notify
+        else:
+            notify_configs = [task.notify]
+
         config = load_config()
-        channel_config = config.get("channels", {}).get(task.notify.channel, {})
-
-        try:
-            channel = get_channel(task.notify.channel, config=channel_config if channel_config else None)
-        except (ValueError, Exception) as e:
-            # Channel not available or misconfigured
-            return [
-                MessageResult(
-                    success=False,
-                    error=f"Failed to get channel '{task.notify.channel}': {e}",
-                )
-            ]
-
+        results: list[MessageResult] = []
         message = self._format_message(task, exit_code, output)
 
-        results: list[MessageResult] = []
-        for recipient in task.notify.recipients:
+        for notify_config in notify_configs:
+            channel_config = config.get("channels", {}).get(notify_config.channel, {})
+
             try:
-                result = await channel.send_text(recipient, message)
-                results.append(result)
-            except Exception as e:
+                channel = get_channel(notify_config.channel, config=channel_config if channel_config else None)
+            except (ValueError, Exception) as e:
                 results.append(
                     MessageResult(
                         success=False,
-                        error=str(e),
+                        error=f"Failed to get channel '{notify_config.channel}': {e}",
                     )
                 )
+                continue
+
+            for recipient in notify_config.recipients:
+                try:
+                    result = await channel.send_text(recipient, message)
+                    results.append(result)
+                except Exception as e:
+                    results.append(
+                        MessageResult(
+                            success=False,
+                            error=str(e),
+                        )
+                    )
 
         return results
 

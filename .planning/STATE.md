@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-18)
 Phase: 21 of 21 (Update Command & Release)
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-04-17
+Last activity: 2026-04-18 - Completed quick task 260418-iyg: system channel & multi-notify support
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -76,6 +76,12 @@ None yet.
 ### Blockers/Concerns
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260418-iyg | system channel & multi-notify support | 2026-04-18 | — | [260418-iyg-system-channel-multi-notify-support](./quick/260418-iyg-system-channel-multi-notify-support/) |
 
 ## Deferred Items
 

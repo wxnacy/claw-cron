@@ -57,6 +57,7 @@ __all__ = [
     "FeishuChannel",
     "IMessageChannel",
     "QQBotChannel",
+    "SystemChannel",
     "WeComChannel",
 ]
 
@@ -152,6 +153,9 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
         required = ["corp_id", "agent_id", "secret"]
         if any(field not in channel_cfg for field in required):
             return "⚠", "配置不完整"
+    elif channel_id == "system":
+        # System channel doesn't require configuration
+        pass
 
     return "✓", "已配置"
 
@@ -161,10 +165,12 @@ from .email import EmailChannel
 from .feishu import FeishuChannel
 from .imessage import IMessageChannel
 from .qqbot import QQBotChannel
+from .system import SystemChannel
 from .wecom import WeComChannel
 
 CHANNEL_REGISTRY["email"] = EmailChannel
 CHANNEL_REGISTRY["feishu"] = FeishuChannel
 CHANNEL_REGISTRY["imessage"] = IMessageChannel
 CHANNEL_REGISTRY["qqbot"] = QQBotChannel
+CHANNEL_REGISTRY["system"] = SystemChannel
 CHANNEL_REGISTRY["wecom"] = WeComChannel

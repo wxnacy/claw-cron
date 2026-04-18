@@ -31,7 +31,7 @@ class Task:
         client: AI client to use — "kiro-cli", "codebuddy", or "opencode" (agent type).
         client_cmd: Full command template override for this task (highest priority, overrides config.yaml and built-in defaults). Use {prompt} as placeholder.
         enabled: Whether the task is active. Defaults to True.
-        notify: Notification configuration. Optional.
+        notify: Notification configuration. Can be single NotifyConfig or list for multi-channel support.
         message: Message for reminder type tasks. Optional.
         env: Custom environment variables to inject with CLAW_CONTEXT_ prefix. Optional.
     """
@@ -44,7 +44,7 @@ class Task:
     client: str | None = None
     client_cmd: str | None = None
     enabled: bool = field(default=True)
-    notify: NotifyConfig | None = None
+    notify: NotifyConfig | list[NotifyConfig] | None = None
     message: str | None = None
     env: dict[str, str] | None = None
 
@@ -60,11 +60,15 @@ def _load_raw(path: Path = TASKS_FILE) -> list[dict[str, Any]]:
 
 def _task_from_dict(raw: dict[str, Any]) -> Task:
     """Create Task from raw dict, handling nested NotifyConfig."""
-    # Handle notify field conversion
-    if "notify" in raw and isinstance(raw["notify"], dict):
+    # Handle notify field conversion (single or list)
+    if "notify" in raw and raw["notify"]:
         from claw_cron.notifier import NotifyConfig
 
-        raw["notify"] = NotifyConfig.from_dict(raw["notify"])
+        notify_data = raw["notify"]
+        if isinstance(notify_data, list):
+            raw["notify"] = [NotifyConfig.from_dict(item) for item in notify_data]
+        elif isinstance(notify_data, dict):
+            raw["notify"] = NotifyConfig.from_dict(notify_data)
     return Task(**raw)
 
 

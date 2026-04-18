@@ -107,6 +107,7 @@ def resolve_recipient(
 ) -> str:
     """Resolve recipient alias to openid format.
 
+    - If channel is 'system', return recipient as-is (no resolution needed)
     - If recipient starts with "c2c:" or "group:", return as-is
     - If recipient is a known alias, return "c2c:{openid}"
     - Raise ValueError if alias not found or channel mismatch
@@ -122,6 +123,10 @@ def resolve_recipient(
     Raises:
         ValueError: If alias not found or channel mismatch.
     """
+    # System channel doesn't need recipient resolution
+    if channel == "system":
+        return recipient
+
     # If already in openid format, return as-is
     if recipient.startswith("c2c:") or recipient.startswith("group:"):
         return recipient

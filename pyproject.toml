@@ -27,6 +27,8 @@ dependencies = [
     "httpx",
     "aiosmtplib>=3.0",
     "markdown>=3.5",
+    "desktop-notifier>=6.2.0",
+    "pync>=2.0.3",
 ]
 
 [project.scripts]

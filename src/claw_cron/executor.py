@@ -203,33 +203,54 @@ async def execute_task_with_notify(task: Task) -> int:
     merged["execution_count"] = existing.get("execution_count", 0) + 1
     save_context(task.name, merged)
 
-    if task.notify and evaluate_when(task.notify.when, merged):
-        try:
-            notifier = Notifier()
-            results = await notifier.notify_task_result(task, exit_code, output)
+    if task.notify:
+        # Normalize to list for consistent handling
+        notify_configs = task.notify if isinstance(task.notify, list) else [task.notify]
 
-            # Log notification results
-            if results:
-                failed_count = sum(1 for r in results if not r.success)
-                success_count = len(results) - failed_count
+        for notify_config in notify_configs:
+            if not evaluate_when(notify_config.when, merged):
+                continue
 
-                if success_count > 0:
-                    logger.info(
-                        f"Notification sent successfully to {success_count} recipient(s) "
-                        f"via {task.notify.channel}"
-                    )
+            try:
+                notifier = Notifier()
+                # Create a temporary task with single notify config for this iteration
+                temp_task = Task(
+                    name=task.name,
+                    cron=task.cron,
+                    type=task.type,
+                    script=task.script,
+                    prompt=task.prompt,
+                    client=task.client,
+                    client_cmd=task.client_cmd,
+                    enabled=task.enabled,
+                    notify=notify_config,
+                    message=task.message,
+                    env=task.env,
+                )
+                results = await notifier.notify_task_result(temp_task, exit_code, output)
 
-                if failed_count > 0:
-                    for result in results:
-                        if not result.success:
-                            logger.error(
-                                f"Notification failed for task '{task.name}' "
-                                f"via {task.notify.channel}: {result.error}"
-                            )
-        except Exception as e:
-            logger.error(
-                f"Notification error for task '{task.name}': {type(e).__name__}: {e}"
-            )
+                # Log notification results
+                if results:
+                    failed_count = sum(1 for r in results if not r.success)
+                    success_count = len(results) - failed_count
+
+                    if success_count > 0:
+                        logger.info(
+                            f"Notification sent successfully to {success_count} recipient(s) "
+                            f"via {notify_config.channel}"
+                        )
+
+                    if failed_count > 0:
+                        for result in results:
+                            if not result.success:
+                                logger.error(
+                                    f"Notification failed for task '{task.name}' "
+                                    f"via {notify_config.channel}: {result.error}"
+                                )
+            except Exception as e:
+                logger.error(
+                    f"Notification error for task '{task.name}' via {notify_config.channel}: {type(e).__name__}: {e}"
+                )
 
     return exit_code
 

@@ -22,31 +22,40 @@ console = Console()
 @click.option("--name", default=None, help="Unique task name")
 @click.option("--cron", default=None, help="Cron expression (e.g., '0 8 * * *')")
 @click.option("--script", default=None, help="Shell command to execute")
-@click.option("--channel", default=None, help="Notification channel (optional)")
+@click.option("--channel", default="system", help="Notification channel (default: system)")
 @click.option(
     "--recipient",
     "recipients",
     multiple=True,
-    default=None,
-    help="Notification recipient (optional, can be repeated)",
+    default=("local",),
+    help="Notification recipient (default: local for system channel)",
 )
+@click.option("--no-notify", is_flag=True, help="Disable notification")
 def command(
     name: str | None,
     cron: str | None,
     script: str | None,
-    channel: str | None,
-    recipients: tuple[str, ...] | None,
+    channel: str,
+    recipients: tuple[str, ...],
+    no_notify: bool,
 ) -> None:
     """Create a command-type scheduled task.
 
     Direct mode: provide --name, --cron, --script to create directly.
     Interactive mode: omit required options for guided creation.
 
+    By default, uses 'system' channel for desktop notifications.
+    Use --no-notify to disable notifications.
+
     Examples:
-        # Direct mode
+        # Direct mode with default system notification
         claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
 
-        # With notification
+        # Disable notification
+        claw-cron command --name backup --cron "0 2 * * *" \\
+            --script "backup.sh" --no-notify
+
+        # With QQ Bot notification
         claw-cron command --name health-check --cron "*/30 * * * *" \\
             --script "curl -s https://api.example.com/health" \\
             --channel qqbot --recipient me
@@ -56,10 +65,10 @@ def command(
     """
     # Check if entering interactive mode
     if not all([name, cron, script]):
-        return _command_interactive(name, cron, script, channel, recipients)
+        return _command_interactive(name, cron, script, channel if not no_notify else None, recipients if not no_notify else None)
 
     # Direct mode
-    _command_direct(name, cron, script, channel, recipients)
+    _command_direct(name, cron, script, None if no_notify else channel, recipients if not no_notify else None)
 
 
 def _command_direct(
@@ -95,6 +104,8 @@ def _command_direct(
     console.print(f"[dim]  Script: {script}[/dim]")
     if notify:
         console.print(f"[dim]  Notify: {channel} -> {', '.join(recipients or [])}[/dim]")
+    else:
+        console.print(f"[dim]  Notify: disabled[/dim]")
 
 
 def _command_interactive(
@@ -126,19 +137,20 @@ def _command_interactive(
 
     # 4. Optional notification
     notify = None
-    if prompt_confirm("\n配置执行通知?", default=False):
+    if prompt_confirm("\n配置执行通知?", default=True):
         config = load_config()
         channels_config = config.get("channels", {})
 
-        if not channels_config:
-            console.print("[yellow]未配置通知通道，跳过通知设置[/yellow]")
+        # Include system channel as default option
+        available_channels = list(channels_config.keys())
+        if "system" not in available_channels:
+            available_channels.insert(0, "system")
+
+        if len(available_channels) == 1:
+            selected_channel = available_channels[0]
         else:
-            available_channels = list(channels_config.keys())
-            if len(available_channels) == 1:
-                selected_channel = available_channels[0]
-            else:
-                console.print("\n[bold]选择通知通道:[/bold]")
-                selected_channel = prompt_select("通道", choices=available_channels)
+            console.print("\n[bold]选择通知通道:[/bold]")
+            selected_channel = prompt_select("通道", choices=available_channels, default="system")
 
             # Select recipient
             contacts_data = load_contacts()
@@ -147,7 +159,10 @@ def _command_interactive(
                 if c.channel == selected_channel
             }
 
-            if channel_contacts:
+            # System channel doesn't need recipient selection
+            if selected_channel == "system":
+                selected_recipients = ["local"]
+            elif channel_contacts:
                 console.print("\n[bold]选择收件人:[/bold]")
                 recipient_choices = list(channel_contacts.keys()) + ["[手动输入]"]
                 selected = prompt_select("收件人", choices=recipient_choices)
