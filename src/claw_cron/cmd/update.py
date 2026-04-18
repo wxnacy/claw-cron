@@ -148,62 +148,57 @@ def _update_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
 
     from claw_cron.prompt import prompt_cron, prompt_text
 
-    # Build field choices with current values
     def _short(v: object, maxlen: int = 40) -> str:
         s = str(v) if v is not None else "null"
         return s if len(s) <= maxlen else s[:maxlen - 1] + "…"
 
-    notify_summary = _notify_summary(task)
-
-    # Use plain strings for checkbox — Choice objects cause keybinding issues in some terminals
-    field_map = {
-        f"cron     [{_short(task.cron)}]":    "cron",
-        f"enabled  [{task.enabled}]":          "enabled",
-        f"message  [{_short(task.message)}]":  "message",
-        f"script   [{_short(task.script)}]":   "script",
-        f"prompt   [{_short(task.prompt)}]":   "prompt",
-        f"notify   [{notify_summary}]":        "notify",
-    }
-
-    while True:
-        selected_labels: list[str] = inquirer.checkbox(
-            message="选择要修改的字段:",
-            choices=list(field_map.keys()),
-            instruction="(空格选中/取消，↑↓移动，回车确认)",
-        ).execute()
-        if selected_labels:
-            break
-        console.print("[yellow]请至少选择一个字段[/yellow]")
-
-    selected_fields = [field_map[label] for label in selected_labels]
-
     scalar_updates: dict = {}
 
-    for field in selected_fields:
+    while True:
+        # Reload task to reflect latest notify state
+        from claw_cron.storage import get_task as _get_task
+        current = _get_task(name)
+        notify_summary = _notify_summary(current)  # type: ignore[arg-type]
+
+        choices = [
+            f"cron     [{_short(current.cron)}]",  # type: ignore[union-attr]
+            f"enabled  [{current.enabled}]",  # type: ignore[union-attr]
+            f"message  [{_short(current.message)}]",  # type: ignore[union-attr]
+            f"script   [{_short(current.script)}]",  # type: ignore[union-attr]
+            f"prompt   [{_short(current.prompt)}]",  # type: ignore[union-attr]
+            f"notify   [{notify_summary}]",
+            "── 完成 ──",
+        ]
+
+        label: str = inquirer.select(
+            message="选择要修改的字段:",
+            choices=choices,
+        ).execute()
+
+        if label == "── 完成 ──":
+            break
+
+        field = label.split("[")[0].strip()
+
         if field == "cron":
             scalar_updates["cron"] = prompt_cron()
-
         elif field == "enabled":
             scalar_updates["enabled"] = inquirer.confirm(
-                message="启用任务?", default=task.enabled
+                message="启用任务?", default=current.enabled  # type: ignore[union-attr]
             ).execute()
-
         elif field == "message":
-            scalar_updates["message"] = prompt_text("新 message:", default=task.message or "")
-
+            scalar_updates["message"] = prompt_text("新 message:", default=current.message or "")  # type: ignore[union-attr]
         elif field == "script":
-            scalar_updates["script"] = prompt_text("新 script:", default=task.script or "")
-
+            scalar_updates["script"] = prompt_text("新 script:", default=current.script or "")  # type: ignore[union-attr]
         elif field == "prompt":
-            scalar_updates["prompt"] = prompt_text("新 prompt:", default=task.prompt or "")
-
+            scalar_updates["prompt"] = prompt_text("新 prompt:", default=current.prompt or "")  # type: ignore[union-attr]
         elif field == "notify":
-            _notify_interactive(name, task)
+            _notify_interactive(name, current)  # type: ignore[arg-type]
 
-    if scalar_updates:
-        update_task(name, **scalar_updates)
-        for key, value in scalar_updates.items():
-            console.print(f"  [dim]{key}[/dim] = {value}")
+        # Apply scalar updates immediately so next loop shows updated values
+        if scalar_updates:
+            update_task(name, **scalar_updates)
+            scalar_updates = {}
 
     console.print(f"[green]Task '{name}' updated.[/green]")
 
@@ -276,31 +271,32 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
             ).execute()
             cfg = next(c for c in configs if c.channel == channel)
 
-            edit_map = {
-                f"recipient  [{', '.join(cfg.recipients)}]": "recipient",
-                f"when       [{cfg.when or 'null'}]":        "when",
-            }
-            what_labels = inquirer.checkbox(
-                message=f"修改 {channel} 的哪些项:",
-                choices=list(edit_map.keys()),
-                instruction="(空格选中/取消，回车确认)",
-            ).execute()
-            if not what_labels:
-                console.print("[yellow]未选择任何项，跳过[/yellow]")
-                continue
-            what = [edit_map[l] for l in what_labels]
-
+            edit_choices = [
+                f"recipient  [{', '.join(cfg.recipients)}]",
+                f"when       [{cfg.when or 'null'}]",
+                "── 完成 ──",
+            ]
+            what: list[str] = []
             new_recipients = None
             new_when = None
             clear_when = False
 
-            if "recipient" in what:
-                new_recipients = _prompt_recipients(channel, current=cfg.recipients)
-
-            if "when" in what:
-                raw = prompt_text("条件表达式 (留空清除):", default=cfg.when or "")
-                clear_when = raw == ""
-                new_when = raw if raw else None
+            while True:
+                edit_label: str = inquirer.select(
+                    message=f"修改 {channel} 的哪项:",
+                    choices=edit_choices,
+                ).execute()
+                if edit_label == "── 完成 ──":
+                    break
+                edit_field = edit_label.split("[")[0].strip()
+                if edit_field == "recipient":
+                    new_recipients = _prompt_recipients(channel, current=cfg.recipients)
+                    edit_choices[0] = f"recipient  [{', '.join(new_recipients)}]"
+                elif edit_field == "when":
+                    raw = prompt_text("条件表达式 (留空清除):", default=cfg.when or "")
+                    clear_when = raw == ""
+                    new_when = raw if raw else None
+                    edit_choices[1] = f"when       [{new_when or 'null'}]"
 
             notify_update(name, channel, recipients=new_recipients, when=new_when, clear_when=clear_when)
             console.print(f"  [dim]{channel} 已更新[/dim]")
