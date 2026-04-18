@@ -32,8 +32,9 @@ from .exceptions import (
     ProviderRateLimitError,
     ProviderResponseError,
 )
-from .tools import ToolCall, ToolDefinition, to_anthropic_tool, to_openai_tool
+from .tools import ToolCall, ToolDefinition, to_anthropic_tool, to_codebuddy_tool, to_openai_tool
 from .anthropic import AnthropicProvider
+from .codebuddy import CodebuddyProvider
 from .openai import OpenAIProvider
 
 __all__ = [
@@ -45,6 +46,7 @@ __all__ = [
     "ToolCall",
     "to_anthropic_tool",
     "to_openai_tool",
+    "to_codebuddy_tool",
     # Exceptions
     "ProviderError",
     "ProviderAuthError",
@@ -53,13 +55,14 @@ __all__ = [
     "ProviderResponseError",
     # Providers
     "AnthropicProvider",
+    "CodebuddyProvider",
     "OpenAIProvider",
     # Factory
     "get_provider",
     "ProviderType",
 ]
 
-ProviderType = Literal["claude", "openai"]
+ProviderType = Literal["claude", "openai", "codebuddy"]
 
 
 def get_provider(
@@ -85,6 +88,7 @@ def get_provider(
     providers = {
         "claude": AnthropicProvider,
         "openai": OpenAIProvider,
+        "codebuddy": CodebuddyProvider,
     }
 
     if provider not in providers:
