@@ -332,16 +332,19 @@ class FeishuChannel(MessageChannel):
             log_level=lark.LogLevel.ERROR,
         )
 
-        async def _wait_for_capture() -> None:
+        import threading
+
+        # ws_client.start() is sync and blocks — run in daemon thread
+        t = threading.Thread(target=ws_client.start, daemon=True)
+        t.start()
+
+        async def _wait_for_capture() -> str:
             while not captured_openid:
                 await asyncio.sleep(0.1)
-
-        async def _do_capture() -> str:
-            await asyncio.gather(ws_client.start(), _wait_for_capture())
             return captured_openid  # type: ignore[return-value]
 
         try:
-            return await asyncio.wait_for(_do_capture(), timeout=timeout)
+            return await asyncio.wait_for(_wait_for_capture(), timeout=timeout)
         except asyncio.TimeoutError:
             raise ChannelError(
                 f"Capture timed out after {timeout}s", channel_id=self.channel_id
