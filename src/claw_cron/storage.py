@@ -141,6 +141,81 @@ def delete_task(name: str, path: Path = TASKS_FILE) -> bool:
     return True
 
 
+def get_notify_list(task: "Task") -> list["NotifyConfig"]:
+    """Return task notify as a normalized list (never None)."""
+    from claw_cron.notifier import NotifyConfig  # noqa: F401
+
+    if task.notify is None:
+        return []
+    if isinstance(task.notify, list):
+        return list(task.notify)
+    return [task.notify]
+
+
+def notify_add(name: str, channel: str, recipients: list[str], when: str | None = None, path: Path = TASKS_FILE) -> bool:
+    """Add a notify channel to a task. Returns False if channel already exists."""
+    from claw_cron.notifier import NotifyConfig
+
+    tasks = load_tasks(path)
+    for task in tasks:
+        if task.name == name:
+            configs = get_notify_list(task)
+            if any(c.channel == channel for c in configs):
+                return False
+            configs.append(NotifyConfig(channel=channel, recipients=recipients, when=when or None))
+            task.notify = configs
+            save_tasks(tasks, path)
+            return True
+    return False
+
+
+def notify_remove(name: str, channel: str, path: Path = TASKS_FILE) -> bool:
+    """Remove a notify channel from a task. Returns False if channel not found."""
+    tasks = load_tasks(path)
+    for task in tasks:
+        if task.name == name:
+            configs = get_notify_list(task)
+            new_configs = [c for c in configs if c.channel != channel]
+            if len(new_configs) == len(configs):
+                return False
+            task.notify = new_configs or None
+            save_tasks(tasks, path)
+            return True
+    return False
+
+
+def notify_update(name: str, channel: str, recipients: list[str] | None = None, when: str | None = None, clear_when: bool = False, path: Path = TASKS_FILE) -> bool:
+    """Update recipients or when condition of an existing notify channel."""
+    tasks = load_tasks(path)
+    for task in tasks:
+        if task.name == name:
+            configs = get_notify_list(task)
+            for cfg in configs:
+                if cfg.channel == channel:
+                    if recipients is not None:
+                        cfg.recipients = recipients
+                    if clear_when:
+                        cfg.when = None
+                    elif when is not None:
+                        cfg.when = when
+                    task.notify = configs
+                    save_tasks(tasks, path)
+                    return True
+            return False
+    return False
+
+
+def notify_clear(name: str, path: Path = TASKS_FILE) -> bool:
+    """Remove all notify configs from a task."""
+    tasks = load_tasks(path)
+    for task in tasks:
+        if task.name == name:
+            task.notify = None
+            save_tasks(tasks, path)
+            return True
+    return False
+
+
 def update_task(name: str, path: Path = TASKS_FILE, **kwargs: Any) -> bool:
     """Update fields of an existing task by name.
 
