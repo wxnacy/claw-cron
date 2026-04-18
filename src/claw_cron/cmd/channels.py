@@ -257,7 +257,8 @@ def add() -> None:
 def _do_wecom_capture(alias: str) -> None:
     from claw_cron.channels import get_channel
     from claw_cron.channels.exceptions import ChannelError
-    ch = get_channel("wecom")
+    _cfg = load_config().get("channels", {}).get("wecom", {})
+    ch = get_channel("wecom", config=_cfg if _cfg else None)
     try:
         userid = asyncio.run(ch.capture_openid())
         console.print(f"[green]✓ UserID 已捕获: [bold]{userid}[/bold][/green]")
@@ -545,7 +546,9 @@ def capture(alias: str) -> None:
     from claw_cron.channels.exceptions import ChannelConfigError, ChannelError
 
     channel_type = prompt_capture_channel_select()
-    channel = get_channel(channel_type)
+    config = load_config()
+    channel_cfg = config.get("channels", {}).get(channel_type, {})
+    channel = get_channel(channel_type, config=channel_cfg if channel_cfg else None)
     display_name = CHANNEL_DISPLAY_NAMES.get(channel_type, channel_type)
 
     if not channel.supports_capture:
