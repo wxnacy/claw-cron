@@ -157,21 +157,23 @@ def _update_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
     notify_summary = _notify_summary(task)
 
     field_choices = [
-        Choice(value="cron",    name=f"cron       (当前: {_short(task.cron)})"),
-        Choice(value="enabled", name=f"enabled    (当前: {task.enabled})"),
-        Choice(value="message", name=f"message    (当前: {_short(task.message)})"),
-        Choice(value="script",  name=f"script     (当前: {_short(task.script)})"),
-        Choice(value="prompt",  name=f"prompt     (当前: {_short(task.prompt)})"),
-        Choice(value="notify",  name=f"notify     (当前: {notify_summary})"),
+        Choice(value="cron",    name=f"cron     [{_short(task.cron)}]"),
+        Choice(value="enabled", name=f"enabled  [{task.enabled}]"),
+        Choice(value="message", name=f"message  [{_short(task.message)}]"),
+        Choice(value="script",  name=f"script   [{_short(task.script)}]"),
+        Choice(value="prompt",  name=f"prompt   [{_short(task.prompt)}]"),
+        Choice(value="notify",  name=f"notify   [{notify_summary}]"),
     ]
 
-    selected_fields: list[str] = inquirer.checkbox(
-        message="选择要修改的字段:",
-        choices=field_choices,
-        instruction="(空格选中/取消，↑↓移动，回车确认)",
-        validate=lambda result: len(result) > 0,
-        invalid_message="请至少选择一个字段",
-    ).execute()
+    while True:
+        selected_fields: list[str] = inquirer.checkbox(
+            message="选择要修改的字段:",
+            choices=field_choices,
+            instruction="(空格选中/取消，↑↓移动，回车确认)",
+        ).execute()
+        if selected_fields:
+            break
+        console.print("[yellow]请至少选择一个字段[/yellow]")
 
     scalar_updates: dict = {}
 
@@ -275,13 +277,14 @@ def _notify_interactive(name: str, task) -> None:  # type: ignore[no-untyped-def
             what = inquirer.checkbox(
                 message=f"修改 {channel} 的哪些项:",
                 choices=[
-                    Choice(value="recipient", name=f"recipient  (当前: {', '.join(cfg.recipients)})"),
-                    Choice(value="when",      name=f"when       (当前: {cfg.when or 'null'})"),
+                    Choice(value="recipient", name=f"recipient  [{', '.join(cfg.recipients)}]"),
+                    Choice(value="when",      name=f"when       [{cfg.when or 'null'}]"),
                 ],
                 instruction="(空格选中/取消，回车确认)",
-                validate=lambda result: len(result) > 0,
-                invalid_message="请至少选择一项",
             ).execute()
+            if not what:
+                console.print("[yellow]未选择任何项，跳过[/yellow]")
+                continue
 
             new_recipients = None
             new_when = None
