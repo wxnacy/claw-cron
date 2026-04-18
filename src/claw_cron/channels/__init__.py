@@ -126,6 +126,8 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
 
     # Check if channel has any config
     if channel_id not in channels_config:
+        if channel_id == "system":
+            return "✓", "已配置"
         return "○", "未配置"
 
     channel_cfg = channels_config[channel_id]
@@ -153,9 +155,6 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
         required = ["corp_id", "agent_id", "secret"]
         if any(field not in channel_cfg for field in required):
             return "⚠", "配置不完整"
-    elif channel_id == "system":
-        # System channel doesn't require configuration
-        pass
 
     return "✓", "已配置"
 
