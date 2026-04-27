@@ -94,6 +94,9 @@ def run_scheduler(stop_event: threading.Event, foreground: bool = True) -> None:
 
     log(f"Scheduler started (PID={__import__('os').getpid()})")
 
+    tasks = load_tasks()
+    log(f"Loaded {len(tasks)} task(s): {', '.join(t.name for t in tasks)}")
+
     while not stop_event.is_set():
         now = datetime.now().replace(second=0, microsecond=0)
         tasks = load_tasks()
