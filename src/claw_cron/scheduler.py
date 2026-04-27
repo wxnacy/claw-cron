@@ -11,9 +11,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from claw_cron.executor import LOGS_DIR, run_task_with_notify
 from claw_cron.storage import load_tasks
 
+LOGS_DIR = Path.home() / ".config" / "claw-cron" / "logs"
 SYSTEM_LOG = LOGS_DIR / "claw-cron.log"
 
 
@@ -106,6 +106,9 @@ def run_scheduler(stop_event: threading.Event, foreground: bool = True) -> None:
             try:
                 if cron_matches(task.cron, now):
                     log(f"Triggered: {task.name} ({task.cron})")
+                    # Lazy import to avoid loading heavy deps at startup
+                    from claw_cron.executor import run_task_with_notify
+
                     t = threading.Thread(target=run_task_with_notify, args=(task,), daemon=True)
                     t.start()
             except ValueError as e:
