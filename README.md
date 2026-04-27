@@ -16,6 +16,15 @@ claw-cron -v          # 查看版本
 claw-cron --version   # 查看版本
 ```
 
+### 任务管理
+
+```bash
+claw-cron list                # 列出所有任务（含通道信息）
+claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
+claw-cron delete <name>       # 删除任务
+claw-cron run <name>          # 立即执行某个任务
+```
+
 ### 启动调度服务
 
 ```bash

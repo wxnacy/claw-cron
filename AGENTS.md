@@ -36,6 +36,12 @@ claw-cron server --restart    # Restart the daemon (stop then start)
 claw-cron server --status     # Show daemon status (running/stopped, PID, log path)
 ```
 
+### List Tasks
+
+```bash
+claw-cron list              # List all tasks with Name, Cron, Type, Script/Prompt, Channels, Status
+```
+
 ### Add a Task (Direct Mode)
 
 ```bash
