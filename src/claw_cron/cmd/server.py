@@ -138,7 +138,8 @@ def _show_status() -> None:
 @click.option("--stop", is_flag=True, default=False, help="Stop the running daemon process.")
 @click.option("--restart", is_flag=True, default=False, help="Restart the daemon process (stop then start).")
 @click.option("--status", is_flag=True, default=False, help="Show the daemon status (running or stopped).")
-def server(daemon: bool, stop: bool, restart: bool, status: bool) -> None:
+@click.option("--pid", is_flag=True, default=False, help="Print the daemon PID (or nothing if not running).")
+def server(daemon: bool, stop: bool, restart: bool, status: bool, pid: bool) -> None:
     """Start the cron scheduler server.
 
     Runs in foreground by default, printing schedule logs to stdout.
@@ -146,7 +147,14 @@ def server(daemon: bool, stop: bool, restart: bool, status: bool) -> None:
     Use --stop to stop a running daemon.
     Use --restart to restart the daemon.
     Use --status to check the daemon status.
+    Use --pid to print the daemon PID.
     """
+    if pid:
+        daemon_pid = _get_daemon_pid()
+        if daemon_pid is not None:
+            console.print(str(daemon_pid))
+        return
+
     if status:
         _show_status()
         return
