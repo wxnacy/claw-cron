@@ -33,6 +33,7 @@ claw-cron server              # Start scheduler in foreground
 claw-cron server --daemon     # Start scheduler as background daemon
 claw-cron server --stop       # Stop the running daemon
 claw-cron server --restart    # Restart the daemon (stop then start)
+claw-cron server --status     # Show daemon status (running/stopped, PID, log path)
 ```
 
 ### Add a Task (Direct Mode)

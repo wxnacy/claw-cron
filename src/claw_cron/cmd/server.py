@@ -119,18 +119,38 @@ def _stop_daemon() -> bool:
         return False
 
 
+def _show_status() -> None:
+    """Print the current daemon status."""
+    pid = _get_daemon_pid()
+    if pid is not None:
+        console.print("[green]:heavy_check_mark: Daemon is running[/green]")
+        console.print(f"  PID: {pid}")
+        console.print(f"  Log: {SYSTEM_LOG}")
+        console.print(f"  PID file: {PID_FILE}")
+    else:
+        console.print("[red]:x: Daemon is not running[/red]")
+        console.print(f"  Log: {SYSTEM_LOG}")
+        console.print(f"  PID file: {PID_FILE}")
+
+
 @click.command()
 @click.option("--daemon", is_flag=True, default=False, help="Run as background daemon process.")
 @click.option("--stop", is_flag=True, default=False, help="Stop the running daemon process.")
 @click.option("--restart", is_flag=True, default=False, help="Restart the daemon process (stop then start).")
-def server(daemon: bool, stop: bool, restart: bool) -> None:
+@click.option("--status", is_flag=True, default=False, help="Show the daemon status (running or stopped).")
+def server(daemon: bool, stop: bool, restart: bool, status: bool) -> None:
     """Start the cron scheduler server.
 
     Runs in foreground by default, printing schedule logs to stdout.
     Use --daemon to run as a background process.
     Use --stop to stop a running daemon.
     Use --restart to restart the daemon.
+    Use --status to check the daemon status.
     """
+    if status:
+        _show_status()
+        return
+
     if stop:
         _stop_daemon()
         return

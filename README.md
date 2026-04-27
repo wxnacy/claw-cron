@@ -23,6 +23,7 @@ claw-cron server              # 前台启动调度服务
 claw-cron server --daemon     # 后台守护进程启动
 claw-cron server --stop       # 停止守护进程
 claw-cron server --restart    # 重启守护进程
+claw-cron server --status     # 查看守护进程状态
 ```
 
 ## Development
