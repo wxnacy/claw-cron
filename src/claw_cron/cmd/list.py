@@ -8,7 +8,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from claw_cron.storage import load_tasks
+from claw_cron.storage import get_notify_list, load_tasks
 
 console = Console()
 
@@ -26,11 +26,14 @@ def list_tasks() -> None:
     table.add_column("Cron", style="green")
     table.add_column("Type")
     table.add_column("Script/Prompt", overflow="fold", max_width=40)
+    table.add_column("Channels")
     table.add_column("Status")
 
     for t in tasks:
         content = t.script or t.prompt or "-"
         status = "✓ enabled" if t.enabled else "✗ disabled"
-        table.add_row(t.name, t.cron, t.type, content, status)
+        configs = get_notify_list(t)
+        channels = ", ".join(c.channel for c in configs) if configs else "system"
+        table.add_row(t.name, t.cron, t.type, content, channels, status)
 
     console.print(table)
