@@ -1,4 +1,6 @@
-.PHONY: install test clean format lint help
+.PHONY: install test clean format lint help service service-uninstall
+
+TAP_PATH := /Users/wxnacy/Documents/Projects/wxnacy/homebrew-tap
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -22,3 +24,15 @@ format: ## 格式化代码
 lint: ## 代码检查
 	uv run ruff check .
 	uv run pyright
+
+service: ## 注册为 brew service（开机自启）
+	brew tap wxnacy/tap $(TAP_PATH) 2>/dev/null || true
+	git -C $(shell brew --repository wxnacy/tap) pull $(TAP_PATH) master
+	brew install --build-from-source wxnacy/tap/claw-cron 2>/dev/null || brew reinstall --build-from-source wxnacy/tap/claw-cron
+	brew services start claw-cron
+	@echo "✅ claw-cron 已注册为 brew service"
+
+service-uninstall: ## 卸载 brew service
+	brew services stop claw-cron
+	brew uninstall wxnacy/tap/claw-cron
+	@echo "✅ claw-cron brew service 已卸载"

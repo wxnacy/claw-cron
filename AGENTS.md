@@ -48,3 +48,25 @@ claw-cron list              # List all tasks with Name, Cron, Type, Script/Promp
 ```bash
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
 ```
+
+## Brew Service (macOS)
+
+Register `claw-cron server` as a launchd service managed by Homebrew Services.
+
+```bash
+make service            # 生成 plist 并注册服务（开机自启）
+make service-uninstall  # 停止并注销服务
+```
+
+日常管理（注册后）：
+
+```bash
+brew services start claw-cron
+brew services stop claw-cron
+brew services restart claw-cron
+brew services list
+```
+
+- plist 路径：`~/Library/LaunchAgents/homebrew.mxcl.claw-cron.plist`
+- 服务日志：`~/.config/claw-cron/server.log`
+- 二进制路径通过 `uv tool dir` 动态获取
