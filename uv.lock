@@ -150,6 +150,7 @@ dependencies = [
     { name = "aiosmtplib" },
     { name = "anthropic" },
     { name = "click" },
+    { name = "codebuddy-agent-sdk" },
     { name = "desktop-notifier" },
     { name = "httpx" },
     { name = "inquirerpy" },
@@ -176,6 +177,7 @@ requires-dist = [
     { name = "aiosmtplib", specifier = ">=3.0" },
     { name = "anthropic" },
     { name = "click" },
+    { name = "codebuddy-agent-sdk" },
     { name = "desktop-notifier", specifier = ">=6.2.0" },
     { name = "httpx" },
     { name = "inquirerpy", specifier = ">=0.3.4" },
@@ -207,6 +209,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/57/75/31212c6bf2503fdf920d87fee5d7a86a2e3bcf444984126f13d8e4016804/click-8.3.2.tar.gz", hash = "sha256:14162b8b3b3550a7d479eafa77dfd3c38d9dc8951f6f69c78913a8f9a7540fd5", size = 302856, upload-time = "2026-04-03T19:14:45.118Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e4/20/71885d8b97d4f3dde17b1fdb92dbd4908b00541c5a3379787137285f602e/click-8.3.2-py3-none-any.whl", hash = "sha256:1924d2c27c5653561cd2cae4548d1406039cb79b858b747cfea24924bbc1616d", size = 108379, upload-time = "2026-04-03T19:14:43.505Z" },
+]
+
+[[package]]
+name = "codebuddy-agent-sdk"
+version = "0.3.130"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "typing-extensions" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/a5/4281d9bab35a33f1cd3b52a9b085a31ef592412f421464f34cd5450d74a7/codebuddy_agent_sdk-0.3.130-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:d3bcf0e05949535a743ab50f922c4779be7bf1f28ecf008f03b66ed2ebd87a65", size = 32283027, upload-time = "2026-04-17T13:46:06.451Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/b3/e173b19874d6b3f653e8b3b0869786c34381be425b32a679dda6c044c954/codebuddy_agent_sdk-0.3.130-py3-none-macosx_11_0_arm64.whl", hash = "sha256:26a8494ad14aefd1a1ea6ea22b4fc2964e82fad6002fd1d5e3c26ee3efc3015e", size = 29917748, upload-time = "2026-04-17T13:46:20.321Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/c6/850868c927dabdcf65a46f776a22ef8896d42e8b25530fbaf05d2b8edc19/codebuddy_agent_sdk-0.3.130-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:7f641e2cf593cd4dd5607366f1bac150c110cd980a5ab4de7a3044a6394a97a9", size = 45717380, upload-time = "2026-04-17T13:46:37.381Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/c2/695172fbb94e966aa6d45d05d3e38df26b79e683725e00e7e6e29ff47fbc/codebuddy_agent_sdk-0.3.130-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:c084b8a89d3ec59fb622f988fd5d62db8ba5db847db64c133adba145995c1fb3", size = 46297646, upload-time = "2026-04-17T13:46:54.615Z" },
+    { url = "https://files.pythonhosted.org/packages/87/3d/a1664e462c44fdd1feef1e59445ec902f1e3eab43409af5bcb7c3bc16036/codebuddy_agent_sdk-0.3.130-py3-none-musllinux_1_1_aarch64.whl", hash = "sha256:0782137d3527f9dc35bb70f44a4939921b04b3c2ab2ff73da9003ac6ddbd3963", size = 43183109, upload-time = "2026-04-17T13:47:10.699Z" },
+    { url = "https://files.pythonhosted.org/packages/05/ec/7f1acb1fa3c82493c293fc139e9aad20100ad4ccba614c3d795fa9b38ceb/codebuddy_agent_sdk-0.3.130-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:bfe5bf156c0fd196f17d106cdb7ddff1e9017e41971e3d32391b803ead729c58", size = 43507424, upload-time = "2026-04-17T13:47:27.071Z" },
+    { url = "https://files.pythonhosted.org/packages/71/22/5706ee7a8a4999b6181e9ef53564ea920290c83eab47297c690037b3f80b/codebuddy_agent_sdk-0.3.130-py3-none-win_amd64.whl", hash = "sha256:be64aef8897b4ae7a7698877ae89973e8106c3a04b1209aa7f214563d8025897", size = 48811707, upload-time = "2026-04-17T13:47:44.197Z" },
 ]
 
 [[package]]
