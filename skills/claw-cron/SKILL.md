@@ -39,7 +39,8 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 | `claw-cron log <name>` | View execution logs |
 | `claw-cron remind` | Create a reminder (supports interactive mode) |
 | `claw-cron chat` | Natural language task management |
-| `claw-cron server` | Start scheduler service |
+| `claw-cron server` | Start/stop/restart the scheduler service |
+| `claw-cron channels` | Manage notification channels (add, capture, send, etc.) |
 | `claw-cron config` | Manage configuration |
 
 ## Task Types
@@ -164,6 +165,41 @@ tasks:
 import json
 success = do_signin()
 print(json.dumps({"signed_in": success}))
+```
+
+## Server Command
+
+```bash
+# Start scheduler in foreground (default)
+claw-cron server
+
+# Start as background daemon
+claw-cron server --daemon
+
+# Stop the running daemon
+claw-cron server --stop
+
+# Restart the daemon (stop then start)
+claw-cron server --restart
+
+# Check daemon status (running/stopped, PID, log path)
+claw-cron server --status
+```
+
+## Channels Command
+
+```bash
+# Add a notification channel (interactive)
+claw-cron channels add
+
+# Capture recipient ID (interactive, supports qqbot/wecom/feishu)
+claw-cron channels capture
+
+# Send a test message
+claw-cron channels send "test message" --channel qqbot --recipient me
+
+# List configured channels
+claw-cron channels list
 ```
 
 ## Update Command
