@@ -57,6 +57,89 @@ class CodebuddyProvider(BaseProvider):
         console.print("  [dim]export CODEBUDDY_API_KEY=your-api-key[/dim]\n")
         console.print("Get your API key from: [link]https://codebuddy.cn[/link]\n")
 
+    @staticmethod
+    def _execute_tool(tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+        """Execute a claw-cron tool call and return the result.
+
+        This is used by the MCP server handlers so that tool results
+        are sent back to the model inside the SDK, preventing the
+        infinite tool-call loop caused by placeholder responses.
+
+        Args:
+            tool_name: Name of the claw-cron tool to execute.
+            tool_input: Arguments passed by the model.
+
+        Returns:
+            Dictionary with a "result" key containing the execution outcome.
+        """
+        from claw_cron.executor import execute_task
+        from claw_cron.storage import Task, add_task, delete_task, get_task, load_tasks, update_task
+
+        try:
+            if tool_name == "list_tasks":
+                tasks = load_tasks()
+                if not tasks:
+                    return {"result": "No tasks found."}
+                lines = [
+                    f"- {t.name} ({t.cron}, {t.type}, {'enabled' if t.enabled else 'disabled'})"
+                    for t in tasks
+                ]
+                return {"result": "\n".join(lines)}
+
+            if tool_name == "add_task":
+                name = tool_input["name"]
+                cron = tool_input["cron"]
+                task_type = tool_input["type"]
+                script = tool_input.get("script")
+                prompt = tool_input.get("prompt")
+                client = tool_input.get("client")
+
+                if task_type == "command" and not script:
+                    return {"result": "Error: script is required for command type tasks"}
+                if task_type == "agent" and not prompt:
+                    return {"result": "Error: prompt is required for agent type tasks"}
+
+                task = Task(
+                    name=name,
+                    cron=cron,
+                    type=task_type,
+                    script=script,
+                    prompt=prompt,
+                    client=client,
+                )
+                add_task(task)
+                return {"result": f"Task '{name}' added successfully."}
+
+            if tool_name == "delete_task":
+                name = tool_input["name"]
+                if delete_task(name):
+                    return {"result": f"Task '{name}' deleted."}
+                return {"result": f"Task '{name}' not found."}
+
+            if tool_name == "run_task":
+                name = tool_input["name"]
+                task = get_task(name)
+                if task is None:
+                    return {"result": f"Task '{name}' not found."}
+                exit_code, _output, _feedback = execute_task(task)
+                return {"result": f"Task '{name}' executed (exit_code={exit_code})."}
+
+            if tool_name == "enable_task":
+                name = tool_input["name"]
+                if update_task(name, enabled=True):
+                    return {"result": f"Task '{name}' enabled."}
+                return {"result": f"Task '{name}' not found."}
+
+            if tool_name == "disable_task":
+                name = tool_input["name"]
+                if update_task(name, enabled=False):
+                    return {"result": f"Task '{name}' disabled."}
+                return {"result": f"Task '{name}' not found."}
+
+            return {"result": f"Unknown tool: {tool_name}"}
+        except Exception as e:
+            return {"result": f"Failed to execute {tool_name}: {e}"}
+
     def chat_with_tools(
         self,
         messages: list[dict[str, Any]],
@@ -89,17 +172,19 @@ class CodebuddyProvider(BaseProvider):
             for t in tools:
                 cb_tool = to_codebuddy_tool(t)
 
-                # Create async handler for each tool
-                @tool(
+                # Use a factory to avoid the late-binding closure trap
+                def _make_handler(name: str) -> Any:
+                    async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+                        return self._execute_tool(name, args)
+                    return _handler
+
+                handler = _make_handler(t.name)
+                decorated = tool(
                     cb_tool["name"],
                     cb_tool["description"],
                     cb_tool["parameters"],
-                )
-                async def _handler(args: dict[str, Any]) -> dict[str, Any]:
-                    # Placeholder - actual tool execution happens elsewhere
-                    return {"status": "tool_call_requested", "args": args}
-
-                tool_handlers.append(_handler)
+                )(handler)
+                tool_handlers.append(decorated)
 
             # Create MCP server with tools
             mcp_server = create_sdk_mcp_server(
@@ -151,45 +236,63 @@ class CodebuddyProvider(BaseProvider):
         """Execute async query and parse result."""
 
         async def _async_query() -> ProviderResult:
-            from codebuddy_agent_sdk import query
+            from codebuddy_agent_sdk import query, CodeBuddyAgentOptions
+            from codebuddy_agent_sdk.types import (
+                AssistantMessage,
+                PermissionResultAllow,
+                PermissionResultDeny,
+                TextBlock,
+            )
+
+            async def _allow_claw_cron_tools(
+                tool_name: str,
+                _input_data: dict[str, Any],
+                _options: Any,
+            ) -> Any:
+                """Allow only claw-cron MCP tools, deny built-in tools."""
+                if tool_name.startswith("mcp__claw_cron_tools__"):
+                    return PermissionResultAllow()
+                return PermissionResultDeny(
+                    message=f"Tool {tool_name} is not allowed"
+                )
+
+            options = CodeBuddyAgentOptions(
+                model=model,
+                mcp_servers={
+                    "claw-cron-tools": mcp_server,
+                },
+                system_prompt=system_prompt,
+                can_use_tool=_allow_claw_cron_tools,
+            )
 
             result = query(
-                prompt=f"{system_prompt}\n\nUser: {prompt}",
-                options={
-                    "model": model,
-                    "max_tokens": max_tokens,
-                    "mcp_servers": {
-                        "claw-cron-tools": mcp_server,
-                    },
-                },
+                prompt=prompt,
+                options=options,
             )
 
             text_content = ""
-            tool_calls: list[ToolCall] = []
-            stop_reason = "end_turn"
 
-            async for message in result:
-                # Parse message types from SDK
-                msg_type = message.get("type", "")
+            async def _consume() -> str:
+                content = ""
+                async for message in result:
+                    if isinstance(message, AssistantMessage):
+                        for block in message.content:
+                            if isinstance(block, TextBlock):
+                                content += block.text
+                return content
 
-                if msg_type == "text":
-                    text_content += message.get("content", "")
-                elif msg_type == "tool_use":
-                    tool_calls.append(
-                        ToolCall(
-                            id=message.get("id", ""),
-                            name=message.get("name", ""),
-                            arguments=message.get("input", {}),
-                        )
-                    )
-                    stop_reason = "tool_use"
-                elif msg_type == "stop":
-                    stop_reason = message.get("reason", "end_turn")
+            try:
+                text_content = await asyncio.wait_for(_consume(), timeout=45.0)
+            except asyncio.TimeoutError:
+                text_content = "Request timed out. Please try again."
+
+            if not text_content.strip():
+                text_content = "Done."
 
             return ProviderResult(
                 content=text_content,
-                tool_calls=tool_calls,
-                stop_reason=stop_reason,
+                tool_calls=[],
+                stop_reason="end_turn",
                 raw_response=None,
             )
 

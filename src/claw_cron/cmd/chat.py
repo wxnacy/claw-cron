@@ -162,6 +162,70 @@ def _handle_tool(tool_name: str, tool_input: dict[str, Any]) -> str:
 
 def _chat_with_provider(user_input: str, ai_provider: Any) -> None:
     """Process a single user message using the provider abstraction."""
+    # Fast path for codebuddy provider: handle common intents directly
+    # to avoid MCP server hangs caused by the codebuddy SDK.
+    from claw_cron.providers.codebuddy import CodebuddyProvider
+
+    if isinstance(ai_provider, CodebuddyProvider):
+        input_lower = user_input.lower().strip()
+
+        if any(kw in input_lower for kw in ("列出", "list", "显示", "show", "所有任务")):
+            tool_result = _handle_tool("list_tasks", {})
+            console.print(f"\n[bold]Assistant:[/bold] {tool_result}")
+            return
+
+        if any(kw in input_lower for kw in ("删除", "delete", "移除", "remove")):
+            parts = user_input.split()
+            for part in parts:
+                if part.lower() not in (
+                    "删除", "delete", "移除", "remove",
+                    "任务", "task", "the", "a", "an",
+                ):
+                    tool_result = _handle_tool("delete_task", {"name": part})
+                    console.print(f"\n[bold]Assistant:[/bold] {tool_result}")
+                    return
+            console.print("\n[bold]Assistant:[/bold] Please specify the task name to delete.")
+            return
+
+        if any(kw in input_lower for kw in ("运行", "run", "执行", "execute")):
+            parts = user_input.split()
+            for part in parts:
+                if part.lower() not in (
+                    "运行", "run", "执行", "execute",
+                    "任务", "task", "the", "a", "an",
+                ):
+                    tool_result = _handle_tool("run_task", {"name": part})
+                    console.print(f"\n[bold]Assistant:[/bold] {tool_result}")
+                    return
+            console.print("\n[bold]Assistant:[/bold] Please specify the task name to run.")
+            return
+
+        if any(kw in input_lower for kw in ("启用", "enable", "开启", "激活")):
+            parts = user_input.split()
+            for part in parts:
+                if part.lower() not in (
+                    "启用", "enable", "开启", "激活",
+                    "任务", "task", "the", "a", "an",
+                ):
+                    tool_result = _handle_tool("enable_task", {"name": part})
+                    console.print(f"\n[bold]Assistant:[/bold] {tool_result}")
+                    return
+            console.print("\n[bold]Assistant:[/bold] Please specify the task name to enable.")
+            return
+
+        if any(kw in input_lower for kw in ("禁用", "disable", "关闭", "停用")):
+            parts = user_input.split()
+            for part in parts:
+                if part.lower() not in (
+                    "禁用", "disable", "关闭", "停用",
+                    "任务", "task", "the", "a", "an",
+                ):
+                    tool_result = _handle_tool("disable_task", {"name": part})
+                    console.print(f"\n[bold]Assistant:[/bold] {tool_result}")
+                    return
+            console.print("\n[bold]Assistant:[/bold] Please specify the task name to disable.")
+            return
+
     tools = _get_tools()
     messages = [{"role": "user", "content": user_input}]
 
