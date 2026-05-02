@@ -25,6 +25,16 @@ claw-cron delete <name>       # 删除任务
 claw-cron run <name>          # 立即执行某个任务
 ```
 
+### AI 聊天管理
+
+```bash
+claw-cron chat                          # 交互式 AI 聊天（默认 claude）
+claw-cron chat --agent codebuddy        # 使用 codebuddy  provider
+claw-cron chat -a openai -m gpt-4o-mini # 使用 openai 并指定模型
+```
+
+支持通过自然语言执行：列出任务、添加任务、删除任务、运行任务、启用/禁用任务。
+
 ### 启动调度服务
 
 ```bash

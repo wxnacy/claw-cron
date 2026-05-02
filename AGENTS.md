@@ -14,11 +14,14 @@ AI-powered cron task manager.
 - `src/claw_cron/cli.py` — Click CLI group entry
 - `src/claw_cron/cmd/` — Subcommand modules
 - `src/claw_cron/cmd/server.py` — Scheduler server command (start/stop/restart daemon)
+- `src/claw_cron/cmd/chat.py` — Natural language chat for task management (claude/openai/codebuddy)
 - `src/claw_cron/scheduler.py` — Cron expression parser and scheduler loop
 - `src/claw_cron/executor.py` — Task executor with notification support
 - `src/claw_cron/storage.py` — YAML task storage
 - `src/claw_cron/notifier.py` — Notification dispatch (qqbot, wecom, feishu, system, imessage, email)
 - `src/claw_cron/channels/` — Channel implementations (qqbot, wecom, feishu)
+- `src/claw_cron/providers/` — AI provider abstractions (claude, openai, codebuddy)
+- `src/claw_cron/providers/codebuddy.py` — Codebuddy SDK provider with MCP tool support
 - `~/.config/claw-cron/tasks.yaml` — Task data file
 - `~/.config/claw-cron/config.yaml` — Channel configuration file
 - `~/.config/claw-cron/claw-cron.pid` — Daemon PID file
@@ -48,6 +51,16 @@ claw-cron list              # List all tasks with Name, Cron, Type, Script/Promp
 ```bash
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
 ```
+
+### Chat (Natural Language)
+
+```bash
+claw-cron chat                          # Interactive AI chat (default: claude)
+claw-cron chat --agent codebuddy        # Use codebuddy provider
+claw-cron chat -a openai -m gpt-4o-mini # Use openai with specific model
+```
+
+Supported operations via chat: list tasks, add task, delete task, run task, enable/disable task.
 
 ## Brew Service (macOS)
 
