@@ -46,6 +46,8 @@ claw-cron server --status     # 查看守护进程状态
 claw-cron server --pid        # 输出守护进程 PID（未运行时不输出）
 ```
 
+> 环境变量：守护进程模式会自动加载 login shell 的环境变量（如 `.zshrc`、`.bash_profile` 中定义的变量），确保任务脚本中的自定义变量在 `run` 和 `server` 模式下表现一致。
+
 ## Development
 
 ```bash

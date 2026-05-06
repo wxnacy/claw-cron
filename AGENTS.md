@@ -16,7 +16,7 @@ AI-powered cron task manager.
 - `src/claw_cron/cmd/server.py` — Scheduler server command (start/stop/restart daemon)
 - `src/claw_cron/cmd/chat.py` — Natural language chat for task management (claude/openai/codebuddy)
 - `src/claw_cron/scheduler.py` — Cron expression parser and scheduler loop
-- `src/claw_cron/executor.py` — Task executor with notification support
+- `src/claw_cron/executor.py` — Task executor with notification support. Loads login-shell environment variables (e.g. `.zshrc`, `.bash_profile`) to ensure profile-defined vars are available in daemon mode.
 - `src/claw_cron/storage.py` — YAML task storage
 - `src/claw_cron/notifier.py` — Notification dispatch (qqbot, wecom, feishu, system, imessage, email)
 - `src/claw_cron/channels/` — Channel implementations (qqbot, wecom, feishu)
