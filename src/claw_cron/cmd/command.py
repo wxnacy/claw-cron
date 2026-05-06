@@ -31,6 +31,7 @@ console = Console()
     help="Notification recipient (default: local for system channel)",
 )
 @click.option("--no-notify", is_flag=True, help="Disable notification")
+@click.option("--cwd", default=None, help="Working directory for task execution")
 def command(
     name: str | None,
     cron: str | None,
@@ -38,6 +39,7 @@ def command(
     channel: str,
     recipients: tuple[str, ...],
     no_notify: bool,
+    cwd: str | None,
 ) -> None:
     """Create a command-type scheduled task.
 
@@ -65,10 +67,10 @@ def command(
     """
     # Check if entering interactive mode
     if not all([name, cron, script]):
-        return _command_interactive(name, cron, script, channel if not no_notify else None, recipients if not no_notify else None)
+        return _command_interactive(name, cron, script, channel if not no_notify else None, recipients if not no_notify else None, cwd)
 
     # Direct mode
-    _command_direct(name, cron, script, None if no_notify else channel, recipients if not no_notify else None)
+    _command_direct(name, cron, script, None if no_notify else channel, recipients if not no_notify else None, cwd)
 
 
 def _command_direct(
@@ -77,6 +79,7 @@ def _command_direct(
     script: str,
     channel: str | None,
     recipients: tuple[str, ...] | None,
+    cwd: str | None,
 ) -> None:
     """Create command task directly from arguments."""
     notify = None
@@ -97,11 +100,14 @@ def _command_direct(
         type="command",
         script=script,
         notify=notify,
+        cwd=cwd,
     )
     add_task(task)
     console.print(f"[green]Command task '{name}' created.[/green]")
     console.print(f"[dim]  Cron: {cron}[/dim]")
     console.print(f"[dim]  Script: {script}[/dim]")
+    if cwd:
+        console.print(f"[dim]  CWD: {cwd}[/dim]")
     if notify:
         console.print(f"[dim]  Notify: {channel} -> {', '.join(recipients or [])}[/dim]")
     else:
@@ -114,6 +120,7 @@ def _command_interactive(
     script: str | None = None,
     channel: str | None = None,
     recipients: tuple[str, ...] | None = None,
+    cwd: str | None = None,
 ) -> None:
     """Interactive guided creation for command task."""
     console.print("[bold cyan]创建命令任务[/bold cyan]\n")
@@ -135,7 +142,12 @@ def _command_interactive(
     if not script:
         script = prompt_text("Shell 命令")
 
-    # 4. Optional notification
+    # 4. Working directory
+    if not cwd:
+        cwd_input = prompt_text("工作目录 (可选，直接回车跳过)")
+        cwd = cwd_input if cwd_input else None
+
+    # 5. Optional notification
     notify = None
     if prompt_confirm("\n配置执行通知?", default=True):
         config = load_config()
@@ -191,11 +203,13 @@ def _command_interactive(
 
             notify = NotifyConfig(channel=selected_channel, recipients=resolved)
 
-    # 5. Preview and confirm
-    console.print(f"\n[bold]确认创建任务:[/bold]")
+    # 6. Preview and confirm
+    console.print("\n[bold]确认创建任务:[/bold]")
     console.print(f"  名称: {name}")
     console.print(f"  时间: {cron}")
     console.print(f"  命令: {script}")
+    if cwd:
+        console.print(f"  工作目录: {cwd}")
     if notify:
         console.print(f"  通知: {notify.channel}")
 
@@ -203,13 +217,14 @@ def _command_interactive(
         console.print("[dim]已取消[/dim]")
         return
 
-    # 6. Create task
+    # 7. Create task
     task = Task(
         name=name,
         cron=cron,
         type="command",
         script=script,
         notify=notify,
+        cwd=cwd,
     )
     add_task(task)
     console.print(f"\n[green]任务 '{name}' 创建成功[/green]")

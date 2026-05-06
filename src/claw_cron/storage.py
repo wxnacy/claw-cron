@@ -34,6 +34,7 @@ class Task:
         notify: Notification configuration. Can be single NotifyConfig or list for multi-channel support.
         message: Message for reminder type tasks. Optional.
         env: Custom environment variables to inject with CLAW_CONTEXT_ prefix. Optional.
+        cwd: Working directory for task execution. Optional.
     """
 
     name: str
@@ -47,6 +48,7 @@ class Task:
     notify: NotifyConfig | list[NotifyConfig] | None = None
     message: str | None = None
     env: dict[str, str] | None = None
+    cwd: str | None = None
 
 
 def _load_raw(path: Path = TASKS_FILE) -> list[dict[str, Any]]:

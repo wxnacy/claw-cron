@@ -30,6 +30,7 @@ console = Console()
     type=click.Choice(["kiro-cli", "codebuddy", "opencode"]),
     help="AI client to use (agent type)",
 )
+@click.option("--cwd", default=None, help="Working directory for task execution")
 def add(
     name: str | None,
     cron: str | None,
@@ -37,6 +38,7 @@ def add(
     script: str | None,
     ai_prompt: str | None,
     client: str | None,
+    cwd: str | None,
 ) -> None:
     """Add a new scheduled task.
 
@@ -45,7 +47,7 @@ def add(
     """
     # Direct mode: all required fields provided
     if name and cron and task_type:
-        _add_direct(name, cron, task_type, script, ai_prompt, client)
+        _add_direct(name, cron, task_type, script, ai_prompt, client, cwd)
         return
 
     # AI interactive mode (Phase 2 Plan 03)
@@ -61,6 +63,7 @@ def _add_direct(
     script: str | None,
     ai_prompt: str | None,
     client: str | None,
+    cwd: str | None,
 ) -> None:
     """Create task directly from provided arguments."""
     if task_type == "command" and not script:
@@ -93,6 +96,7 @@ def _add_direct(
         script=script,
         prompt=ai_prompt,
         client=client,
+        cwd=cwd,
     )
     add_task(task)
     console.print(f"[green]Task '{name}' added.[/green]")

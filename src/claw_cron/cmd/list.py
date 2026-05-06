@@ -26,6 +26,7 @@ def list_tasks() -> None:
     table.add_column("Cron", style="green")
     table.add_column("Type")
     table.add_column("Script/Prompt", overflow="fold", max_width=40)
+    table.add_column("CWD", overflow="fold", max_width=20)
     table.add_column("Channels")
     table.add_column("Status")
 
@@ -34,6 +35,7 @@ def list_tasks() -> None:
         status = "✓ enabled" if t.enabled else "✗ disabled"
         configs = get_notify_list(t)
         channels = ", ".join(c.channel for c in configs) if configs else "system"
-        table.add_row(t.name, t.cron, t.type, content, channels, status)
+        cwd = t.cwd or "-"
+        table.add_row(t.name, t.cron, t.type, content, cwd, channels, status)
 
     console.print(table)

@@ -199,9 +199,9 @@ def execute_task(task: Task) -> tuple[int, str, dict | None]:
     _write_log(log_path, f"[{ts_start}] START: {task.name}\n")
 
     if task.type == "command":
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=env, cwd=task.cwd)
     else:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=task.cwd)
 
     ts_end = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     output = ""
@@ -262,6 +262,7 @@ async def execute_task_with_notify(task: Task) -> int:
                     notify=notify_config,
                     message=task.message,
                     env=task.env,
+                    cwd=task.cwd,
                 )
                 results = await notifier.notify_task_result(temp_task, exit_code, output)
 
