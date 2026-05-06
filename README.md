@@ -19,11 +19,15 @@ claw-cron --version   # 查看版本
 ### 任务管理
 
 ```bash
-claw-cron list                # 列出所有任务（含通道信息）
+claw-cron list                # 列出所有任务（含通道信息和 CWD）
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
+claw-cron add --name test --cron "0 8 * * *" --type command --script "./run.sh" --cwd /path/to/project
+claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd /path/to/project
 claw-cron delete <name>       # 删除任务
 claw-cron run <name>          # 立即执行某个任务
 ```
+
+> `--cwd`：指定任务执行时的工作目录，使脚本中的相对路径在 `run` 和 `server` 模式下表现一致。不指定时继承当前进程的工作目录。
 
 ### AI 聊天管理
 

@@ -43,14 +43,28 @@ claw-cron server --pid        # Print daemon PID (empty if not running)
 ### List Tasks
 
 ```bash
-claw-cron list              # List all tasks with Name, Cron, Type, Script/Prompt, Channels, Status
+claw-cron list              # List all tasks with Name, Cron, Type, Script/Prompt, CWD, Channels, Status
 ```
 
 ### Add a Task (Direct Mode)
 
 ```bash
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
+claw-cron add --name test --cron "0 8 * * *" --type command --script "./run.sh" --cwd /path/to/project
 ```
+
+Options:
+- `--cwd`: Working directory for task execution. Useful when the script uses relative paths.
+
+### Create Command Task
+
+```bash
+claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
+claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd /path/to/project
+```
+
+Options:
+- `--cwd`: Working directory for task execution.
 
 ### Chat (Natural Language)
 
