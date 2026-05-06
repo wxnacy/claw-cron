@@ -73,6 +73,24 @@ def prompt_multiselect(message: str, choices: list[str]) -> list[str]:
     return inquirer.checkbox(message=message, choices=choices).execute()
 
 
+def prompt_fuzzy_select(message: str, choices: list[str]) -> str | None:
+    """Prompt user to select a single option with fuzzy filtering.
+
+    Supports arrow-key navigation and typing to filter the list.
+
+    Args:
+        message: The prompt message to display.
+        choices: List of available choices.
+
+    Returns:
+        The selected choice string, or None if the user cancels.
+    """
+    try:
+        return inquirer.fuzzy(message=message, choices=choices).execute()
+    except KeyboardInterrupt:
+        return None
+
+
 def prompt_cron() -> str:
     """Prompt user to select a cron expression.
 

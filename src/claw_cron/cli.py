@@ -14,6 +14,7 @@ from claw_cron.cmd.context import context
 from claw_cron.cmd.command import command
 from claw_cron.cmd.config import config
 from claw_cron.cmd.delete import delete
+from claw_cron.cmd.info import info
 from claw_cron.cmd.list import list_tasks
 from claw_cron.cmd.log import log
 from claw_cron.cmd.remind import remind
@@ -40,6 +41,7 @@ cli.add_command(context)
 cli.add_command(command)
 cli.add_command(list_tasks)
 cli.add_command(delete)
+cli.add_command(info)
 cli.add_command(run)
 cli.add_command(log)
 cli.add_command(chat)
