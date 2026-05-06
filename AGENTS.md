@@ -14,7 +14,10 @@ AI-powered cron task manager.
 - `src/claw_cron/cli.py` — Click CLI group entry
 - `src/claw_cron/cmd/` — Subcommand modules
 - `src/claw_cron/cmd/server.py` — Scheduler server command (start/stop/restart daemon)
+- `src/claw_cron/cmd/info.py` — Show detailed information for a single task (vertical table)
+- `src/claw_cron/cmd/delete.py` — Delete task by name, with optional interactive fuzzy selector
 - `src/claw_cron/cmd/chat.py` — Natural language chat for task management (claude/openai/codebuddy)
+- `src/claw_cron/prompt.py` — Interactive prompt utilities using InquirerPy (text, confirm, select, fuzzy, cron presets, channel selector)
 - `src/claw_cron/scheduler.py` — Cron expression parser and scheduler loop
 - `src/claw_cron/executor.py` — Task executor with notification support. Loads login-shell environment variables (e.g. `.zshrc`, `.bash_profile`) to ensure profile-defined vars are available in daemon mode.
 - `src/claw_cron/storage.py` — YAML task storage
@@ -44,6 +47,23 @@ claw-cron server --pid        # Print daemon PID (empty if not running)
 
 ```bash
 claw-cron list              # List all tasks with Name, Cron, Type, Script/Prompt, CWD, Channels, Status
+```
+
+### Show Task Info
+
+```bash
+claw-cron info <name>       # Show detailed task info as a vertical table
+claw-cron info              # Interactive fuzzy selector to choose a task
+```
+
+Displays fields: Name, Cron, Type, Enabled, Script/Prompt, Client, Client Cmd, CWD, Message, Channels, Env.
+
+### Delete Task
+
+```bash
+claw-cron delete <name>     # Delete a task by name (with confirmation)
+claw-cron delete            # Interactive fuzzy selector to choose a task, then shows info before confirming
+claw-cron delete <name> -y  # Skip confirmation prompt
 ```
 
 ### Add a Task (Direct Mode)

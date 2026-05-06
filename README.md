@@ -20,10 +20,14 @@ claw-cron --version   # 查看版本
 
 ```bash
 claw-cron list                # 列出所有任务（含通道信息和 CWD）
+claw-cron info <name>         # 查看单个任务的详细信息（竖向表格）
+claw-cron info                # 不传 name，交互式 fuzzy 选择任务
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
 claw-cron add --name test --cron "0 8 * * *" --type command --script "./run.sh" --cwd /path/to/project
 claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd /path/to/project
-claw-cron delete <name>       # 删除任务
+claw-cron delete <name>       # 删除任务（先展示详情，再确认）
+claw-cron delete              # 不传 name，交互式 fuzzy 选择任务
+claw-cron delete <name> -y    # 跳过确认直接删除
 claw-cron run <name>          # 立即执行某个任务
 ```
 
