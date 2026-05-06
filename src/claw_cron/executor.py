@@ -26,6 +26,42 @@ logger = logging.getLogger(__name__)
 
 LOGS_DIR = Path.home() / ".config" / "claw-cron" / "logs"
 
+_shell_env_cache: dict[str, str] | None = None
+
+
+def _load_shell_env() -> dict[str, str]:
+    """Load environment variables from the user's login shell.
+
+    Runs `$SHELL -l -c env` to capture variables defined in shell profiles
+    (e.g. `.zshrc`, `.bash_profile`). Falls back to `/bin/sh` if `$SHELL`
+    is not set. Returns an empty dict if the command fails.
+    """
+    shell = os.environ.get("SHELL", "/bin/sh")
+    try:
+        result = subprocess.run(
+            [shell, "-l", "-c", "env"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+
+    env: dict[str, str] = {}
+    for line in result.stdout.strip().splitlines():
+        if "=" in line:
+            k, v = line.split("=", 1)
+            env[k] = v
+    return env
+
+
+def _get_shell_env() -> dict[str, str]:
+    """Return cached login-shell environment, loading it on first call."""
+    global _shell_env_cache
+    if _shell_env_cache is None:
+        _shell_env_cache = _load_shell_env()
+    return _shell_env_cache
+
 
 def _task_log_path(name: str) -> Path:
     """Return the log file path for a task."""
@@ -74,7 +110,7 @@ def _build_env(task: Task, context: dict) -> dict[str, str]:
         for k, v in task.env.items():
             user_vars[f"CLAW_CONTEXT_{k}"] = str(v)
 
-    return {**os.environ, **system_vars, **user_vars}
+    return {**_get_shell_env(), **os.environ, **system_vars, **user_vars}
 
 
 def _write_context_file(task_name: str, context: dict) -> Path:
