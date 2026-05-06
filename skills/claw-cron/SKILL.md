@@ -11,11 +11,17 @@ description: AI-powered cron task manager for scheduling and managing automated 
 # Add command task
 claw-cron add --name test --cron "0 8 * * *" --type command --script "echo hello"
 
+# Add command task with working directory
+claw-cron add --name test --cron "0 8 * * *" --type command --script "./run.sh" --cwd /path/to/project
+
 # Interactive command creation
 claw-cron command
 
 # Direct command creation
 claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
+
+# Direct command with working directory
+claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd /path/to/project
 
 # Add AI agent task
 claw-cron add --name ai-task --cron "0 9 * * *" --type agent --prompt "总结今日待办" --client codebuddy
@@ -30,9 +36,9 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 
 | Command | Description |
 |---------|-------------|
-| `claw-cron add` | Add a new scheduled task |
-| `claw-cron command` | Create a command-type task (supports interactive mode) |
-| `claw-cron list` | List all tasks |
+| `claw-cron add` | Add a new scheduled task (supports `--cwd`) |
+| `claw-cron command` | Create a command-type task (supports interactive mode and `--cwd`) |
+| `claw-cron list` | List all tasks (shows CWD column) |
 | `claw-cron update <name>` | Update fields of an existing task (`--cron`, `--enabled`, `--message`, `--script`, `--prompt`, notify options); omit all options for interactive mode |
 | `claw-cron delete <name>` | Delete a task (`-y` to skip confirmation) |
 | `claw-cron run <name>` | Execute a task immediately |
@@ -45,11 +51,11 @@ claw-cron remind --name morning --cron "0 8 * * *" \
 
 ## Task Types
 
-| Type | Description | Required Params |
-|------|-------------|-----------------|
-| `command` | Execute shell command | `--script` |
-| `agent` | Execute AI agent task | `--prompt`, `--client` |
-| `reminder` | Send notification | `--message` |
+| Type | Description | Required Params | Optional Params |
+|------|-------------|-----------------|-----------------|
+| `command` | Execute shell command | `--script` | `--cwd` |
+| `agent` | Execute AI agent task | `--prompt`, `--client` | `--cwd` |
+| `reminder` | Send notification | `--message` | — |
 
 ## AI Clients
 
@@ -82,6 +88,29 @@ notify:
 - `{{ date }}` - Current date (YYYY-MM-DD)
 - `{{ time }}` - Current time (HH:MM:SS)
 - `{{ context.KEY }}` - Task context value (e.g. `{{ context.signed_in }}`)
+
+## Working Directory (`--cwd`)
+
+Tasks can specify a working directory so relative paths in scripts behave consistently across all execution modes (`run`, `server`, `server --daemon`, brew service).
+
+```bash
+# Direct mode with cwd
+claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd ~/projects/backup
+
+# Or edit tasks.yaml directly
+tasks:
+  - name: backup
+    type: command
+    cron: "0 2 * * *"
+    script: "./backup.sh"
+    cwd: "/Users/wxnacy/projects/backup"
+```
+
+Without `--cwd`, the task inherits the current working directory from the parent process (varies by startup method).
+
+## Environment Variables (Daemon Mode)
+
+When running in daemon mode (`claw-cron server --daemon`), the scheduler automatically loads environment variables from the user's login shell (e.g. `.zshrc`, `.bash_profile`) so profile-defined variables (like `OBSIDIAN_HOME`) are available to task scripts. This ensures consistent behavior between `claw-cron run` and scheduled execution.
 
 ## Context Injection (v3.0)
 
@@ -302,6 +331,10 @@ claw-cron add --name cleanup --cron "0 2 * * *" \
 # Weekly report every Friday at 5pm
 claw-cron add --name weekly-report --cron "0 17 * * 5" \
     --type command --script "./generate-report.sh"
+
+# Task with working directory (relative paths resolved in ~/scripts)
+claw-cron add --name sync --cron "0 2 * * *" \
+    --type command --script "./sync.sh" --cwd ~/scripts
 ```
 
 ### Interactive Command Creation
@@ -312,6 +345,9 @@ claw-cron command
 
 # Direct mode — system notification by default
 claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh"
+
+# With working directory
+claw-cron command --name backup --cron "0 2 * * *" --script "./backup.sh" --cwd ~/scripts
 
 # Disable notification
 claw-cron command --name backup --cron "0 2 * * *" --script "backup.sh" --no-notify
