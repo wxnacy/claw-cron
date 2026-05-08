@@ -24,6 +24,7 @@ dependencies = [
     "inquirerpy>=0.3.4",
     "websockets",
     "httpx",
+    "lark-oapi>=1.5.3",
     "openim-sdk @ file:///Users/wxnacy/Projects/OpenIM/python-sdk",
     "aiosmtplib>=3.0",
     "markdown>=3.5",
