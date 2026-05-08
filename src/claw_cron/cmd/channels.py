@@ -596,9 +596,9 @@ def verify(channel_type: str) -> None:
 @channels.command()
 @click.option(
     "--alias",
-    prompt="Save as contact alias",
     default="me",
     help="Alias name for the captured contact",
+    hidden=True,
 )
 def capture(alias: str) -> None:
     """Connect to channel and capture user openid.
