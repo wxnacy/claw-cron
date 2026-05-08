@@ -46,4 +46,4 @@ htmlcov/
 .qwen/
 .iflow/
 .workbuddy/
-test.sh
+test*.sh
