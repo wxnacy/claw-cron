@@ -14,10 +14,10 @@ import httpx
 from rich.console import Console
 from rich.table import Table
 
+from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
 from claw_cron.config import load_config, save_config
 from claw_cron.contacts import Contact, contact_key, load_contacts, save_contact
-from claw_cron.prompt import prompt_confirm, prompt_channel_select, prompt_capture_channel_select
-from claw_cron.channels import CHANNEL_REGISTRY, get_channel_status
+from claw_cron.prompt import prompt_capture_channel_select, prompt_channel_select, prompt_confirm
 
 console = Console()
 
@@ -25,6 +25,7 @@ CHANNEL_DISPLAY_NAMES = {
     "qqbot": "QQ Bot",
     "feishu": "飞书",
     "wecom": "企业微信",
+    "dingtalk": "钉钉",
 }
 
 
@@ -80,7 +81,7 @@ def add() -> None:
             console.print("\n[yellow]已取消[/yellow]")
         except ChannelError as e:
             if "timed out" in str(e).lower():
-                console.print(f"\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
+                console.print("\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
             else:
                 console.print(f"[red]Capture 失败: {e}[/red]")
         except ChannelConfigError as e:
@@ -171,6 +172,7 @@ def add() -> None:
         with console.status("[bold green]正在发送验证邮件..."):
             try:
                 import asyncio as _asyncio
+
                 from claw_cron.channels.email import EmailChannel, EmailConfig
                 test_config = EmailConfig(
                     host=host, port=port, username=username,
@@ -216,6 +218,45 @@ def add() -> None:
         save_config(config)
         console.print(f"[green]✓ 通道 '{channel_type}' 已启用[/green]")
         console.print("[dim]iMessage 无需配置凭证[/dim]")
+
+    elif channel_type == "dingtalk":
+        app_id = click.prompt("App ID (AppKey)", type=str)
+        app_secret = click.prompt("App Secret", type=str, hide_input=True)
+        open_id = click.prompt("默认 OpenID (可选)", type=str, default="")
+
+        # Save to openim.yml
+        from pathlib import Path
+
+        import yaml
+
+        openim_path = Path.home() / ".config" / "claw-cron" / "openim.yml"
+        openim_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if openim_path.exists():
+            with openim_path.open() as f:
+                openim_data = yaml.safe_load(f) or {}
+        else:
+            openim_data = {}
+
+        channels = openim_data.get("channels", [])
+        # Remove existing dingtalk entry
+        channels = [ch for ch in channels if ch.get("platform_name") != "dingtalk"]
+        channels.append({
+            "platform_name": "dingtalk",
+            "app_id": app_id,
+            "app_secret": app_secret,
+            "open_id": open_id or None,
+            "is_c2c": False,
+        })
+        openim_data["channels"] = channels
+        if not openim_data.get("default_channel"):
+            openim_data["default_channel"] = open_id or ""
+
+        with openim_path.open("w") as f:
+            yaml.dump(openim_data, f, allow_unicode=True, default_flow_style=False)
+
+        console.print("[green]✓ 通道 'dingtalk' 配置完成[/green]")
+        console.print(f"[dim]配置已保存到 {openim_path}[/dim]")
 
     elif channel_type == "wecom":
         corp_id = click.prompt("Corp ID", type=str)
@@ -305,14 +346,13 @@ def list_channels() -> None:
 
         # Get config display value
         channel_cfg = channels_config.get(channel_id, {})
-        if channel_id == "qqbot":
-            app_id = channel_cfg.get("app_id", "")
-            config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id) or "-"
-        elif channel_id == "feishu":
+        if channel_id == "qqbot" or channel_id == "feishu":
             app_id = channel_cfg.get("app_id", "")
             config_display = f"{app_id[:8]}..." if len(str(app_id)) > 8 else str(app_id) or "-"
         elif channel_id == "imessage":
             config_display = "[dim]无需凭证[/dim]"
+        elif channel_id == "dingtalk":
+            config_display = "[dim]见 openim.yml[/dim]"
         else:
             config_display = "-"
 
@@ -335,7 +375,7 @@ def list_channels() -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom", "dingtalk"]))
 @click.option("--force", is_flag=True, help="Skip confirmation")
 def delete(channel_type: str, force: bool) -> None:
     """Delete a channel configuration.
@@ -367,7 +407,7 @@ def delete(channel_type: str, force: bool) -> None:
 
 
 @channels.command()
-@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom"]))
+@click.argument("channel_type", type=click.Choice(["qqbot", "feishu", "imessage", "email", "wecom", "dingtalk"]))
 def verify(channel_type: str) -> None:
     """Verify channel credentials and connectivity.
 
@@ -478,6 +518,7 @@ def verify(channel_type: str) -> None:
         with console.status("[bold green]正在发送验证邮件..."):
             try:
                 import asyncio as _asyncio
+
                 from claw_cron.channels.email import EmailChannel, EmailConfig
                 test_config = EmailConfig(**{k: v for k, v in email_cfg.items() if k not in ("created_at", "enabled")})
                 channel = EmailChannel(test_config)
@@ -520,6 +561,34 @@ def verify(channel_type: str) -> None:
             except httpx.RequestError as e:
                 console.print(f"[red]✗ 连接失败: {e}[/red]")
                 raise SystemExit(1)
+
+    elif channel_type == "dingtalk":
+        from pathlib import Path
+
+        import yaml
+
+        openim_path = Path.home() / ".config" / "claw-cron" / "openim.yml"
+        if not openim_path.exists():
+            console.print("[red]✗ openim.yml 不存在[/red]")
+            raise SystemExit(1)
+
+        with openim_path.open() as f:
+            openim_data = yaml.safe_load(f) or {}
+
+        channels = openim_data.get("channels", [])
+        dingtalk_cfg = next((ch for ch in channels if ch.get("platform_name") == "dingtalk"), None)
+        if not dingtalk_cfg:
+            console.print("[red]✗ dingtalk 未在 openim.yml 中配置[/red]")
+            raise SystemExit(1)
+
+        app_id = dingtalk_cfg.get("app_id")
+        app_secret = dingtalk_cfg.get("app_secret")
+        if not app_id or not app_secret:
+            console.print("[red]✗ 配置不完整：缺少 app_id 或 app_secret[/red]")
+            raise SystemExit(1)
+
+        console.print("[green]✓ openim.yml 中 dingtalk 配置存在[/green]")
+        console.print(f"[dim]App ID: {app_id[:8]}...[/dim]")
 
     console.print(f"\n[green]✓ 通道 '{channel_type}' 验证通过[/green]")
 
@@ -581,7 +650,7 @@ def capture(alias: str) -> None:
         console.print("\n[yellow]已取消[/yellow]")
     except ChannelError as e:
         if "timed out" in str(e).lower():
-            console.print(f"\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
+            console.print("\n[red]✗ Capture 超时（5 分钟），请确认机器人在线后重试[/red]")
         else:
             console.print(f"[red]Capture 失败: {e}[/red]")
         raise SystemExit(1)
@@ -666,7 +735,6 @@ def delete(alias: str, channel: str | None, force: bool) -> None:
         return
 
     # Load YAML file and remove contact
-    from pathlib import Path
     import yaml
 
     from claw_cron.contacts import CONTACTS_FILE

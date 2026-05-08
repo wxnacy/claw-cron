@@ -205,7 +205,10 @@ def _register_channels() -> None:
     CHANNEL_REGISTRY["qqbot"] = QQBotChannel
     CHANNEL_REGISTRY["system"] = SystemChannel
     CHANNEL_REGISTRY["wecom"] = WeComChannel
-    CHANNEL_REGISTRY["dingtalk"] = lambda c=None: OpenIMBaseChannel("dingtalk", c)  # type: ignore[assignment]
+    def _make_dingtalk(config: ChannelConfig | None = None) -> OpenIMBaseChannel:
+        return OpenIMBaseChannel("dingtalk", config)
+
+    CHANNEL_REGISTRY["dingtalk"] = _make_dingtalk  # type: ignore[assignment]
 
 
 _register_channels()

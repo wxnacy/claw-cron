@@ -17,7 +17,10 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
+
 from claw_cron.channels.base import ChannelConfig, MessageChannel, MessageResult
+from claw_cron.channels.exceptions import ChannelError
 from claw_cron.config import load_config
 from claw_cron.openim_manager import OpenIMProcessManager
 
@@ -36,6 +39,11 @@ class OpenIMBaseChannel(MessageChannel):
     @property
     def channel_id(self) -> str:
         return self._platform
+
+    @property
+    def supports_capture(self) -> bool:
+        """OpenIM channels support capture via WebSocket."""
+        return True
 
     def _get_openim_uri(self) -> str:
         """Resolve openim WebSocket URI from config.yaml."""
@@ -95,3 +103,59 @@ class OpenIMBaseChannel(MessageChannel):
     async def health_check(self) -> bool:
         """Check if openim server is reachable."""
         return OpenIMProcessManager.is_running()
+
+    async def capture_openid(self, timeout: int = 300) -> str:
+        """Capture user openid by waiting for an incoming message via OpenIM.
+
+        Connects to the OpenIM WebSocket and waits for the first inbound
+        message from the target platform, returning its sender_id.
+
+        Args:
+            timeout: Timeout in seconds (default: 300s / 5 min).
+
+        Returns:
+            Captured openid string.
+
+        Raises:
+            ChannelConfigError: If openim is not configured.
+            ChannelError: If capture times out or connection fails.
+        """
+        from openim_sdk import OpenIMClient
+        from openim_sdk.models import Direction
+
+        we_started = OpenIMProcessManager.ensure_running()
+        try:
+            uri = self._get_openim_uri()
+            client = OpenIMClient(uri)
+            await client.connect()
+            try:
+                captured_openid: str | None = None
+
+                async def _wait_for_message() -> None:
+                    nonlocal captured_openid
+                    async for msg in client.messages():
+                        if msg.direction == Direction.INBOUND and msg.platform == self._platform:
+                            captured_openid = msg.sender_id
+                            return
+
+                try:
+                    await asyncio.wait_for(_wait_for_message(), timeout=timeout)
+                except TimeoutError:
+                    raise ChannelError(
+                        f"Capture timed out after {timeout}s. "
+                        f"Please send a message to your {self._platform} bot."
+                    ) from None
+
+                if captured_openid is None:
+                    raise ChannelError("Capture failed: no openid received")
+
+                return captured_openid
+            finally:
+                await client.close()
+        except ChannelError:
+            raise
+        except Exception as e:
+            raise ChannelError(f"Capture failed: {e}") from e
+        finally:
+            if we_started:
+                OpenIMProcessManager.stop()
