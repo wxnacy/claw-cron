@@ -134,18 +134,8 @@ class OpenIMProcessManager:
 
         OPENIM_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        # OpenIM reads config from ~/.config/openim/config.yml only.
-        # Sync our openim.yml to OpenIM's config path before starting.
-        openim_config_dir = Path.home() / ".config" / "openim"
-        openim_config_dir.mkdir(parents=True, exist_ok=True)
-        openim_default_config = openim_config_dir / "config.yml"
-
-        import shutil
-
-        shutil.copy2(str(cfg_path), str(openim_default_config))
-
         proc = subprocess.Popen(
-            [openim_bin, "server", "--port", str(port)],
+            [openim_bin, "--config", str(cfg_path), "server", "--port", str(port)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
