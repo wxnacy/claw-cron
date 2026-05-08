@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import sys
@@ -17,6 +18,7 @@ import click
 from rich.console import Console
 
 from claw_cron.executor import LOGS_DIR
+from claw_cron.openim_manager import OpenIMProcessManager
 from claw_cron.scheduler import SYSTEM_LOG, run_scheduler
 
 PID_FILE = Path.home() / ".config" / "claw-cron" / "claw-cron.pid"
@@ -30,16 +32,12 @@ def _daemonize() -> None:
     # "I/O operation on closed kqueue object" errors on macOS
     import asyncio
 
-    try:
+    with contextlib.suppress(Exception):
         loop = asyncio.get_event_loop()
         if not loop.is_closed():
             loop.close()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         asyncio.set_event_loop(None)
-    except Exception:
-        pass
 
     # First fork: detach from parent
     pid = os.fork()
@@ -106,10 +104,8 @@ def _stop_daemon() -> bool:
             time.sleep(0.1)
         else:
             console.print(f"[red]Daemon did not stop gracefully, sending SIGKILL (PID={pid})...[/red]")
-            try:
+            with contextlib.suppress(OSError, ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
-            except (OSError, ProcessLookupError):
-                pass
         PID_FILE.unlink(missing_ok=True)
         console.print("[green]Daemon stopped.[/green]")
         return True
@@ -179,8 +175,18 @@ def server(daemon: bool, stop: bool, restart: bool, status: bool, pid: bool) -> 
         _daemonize()
         # After daemonize: we are the daemon process
         stop_event = threading.Event()
-        signal.signal(signal.SIGTERM, lambda s, f: stop_event.set())
+
+        def _daemon_stop(signum: int, frame: object) -> None:
+            OpenIMProcessManager.stop()
+            stop_event.set()
+
+        signal.signal(signal.SIGTERM, _daemon_stop)
+        try:
+            OpenIMProcessManager.start()
+        except Exception as e:
+            console.print(f"[red]Failed to start OpenIM: {e}[/red]")
         run_scheduler(stop_event, foreground=False)
+        OpenIMProcessManager.stop()
         PID_FILE.unlink(missing_ok=True)
     else:
         console.print("[cyan]Scheduler starting...[/cyan]")
@@ -196,5 +202,11 @@ def server(daemon: bool, stop: bool, restart: bool, status: bool, pid: bool) -> 
         signal.signal(signal.SIGTERM, _handle_signal)
         signal.signal(signal.SIGINT, _handle_signal)
 
+        try:
+            OpenIMProcessManager.start()
+        except Exception as e:
+            console.print(f"[yellow]OpenIM not started: {e}[/yellow]")
+
         run_scheduler(stop_event, foreground=True)
+        OpenIMProcessManager.stop()
         console.print("[green]Scheduler stopped.[/green]")

@@ -26,9 +26,8 @@ Usage:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from .base import ChannelConfig, MessageChannel, MessageResult
+from .email import EmailChannel
 from .exceptions import (
     ChannelAuthError,
     ChannelConfigError,
@@ -36,6 +35,12 @@ from .exceptions import (
     ChannelNotAvailableError,
     ChannelSendError,
 )
+from .feishu import FeishuChannel
+from .imessage import IMessageChannel
+from .openim import OpenIMBaseChannel
+from .qqbot import QQBotChannel
+from .system import SystemChannel
+from .wecom import WeComChannel
 
 __all__ = [
     # Base classes
@@ -59,6 +64,7 @@ __all__ = [
     "QQBotChannel",
     "SystemChannel",
     "WeComChannel",
+    "OpenIMBaseChannel",
 ]
 
 
@@ -128,6 +134,9 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
     if channel_id not in channels_config:
         if channel_id == "system":
             return "✓", "已配置"
+        # openim-backed channels read from openim.yml
+        if channel_id in ("dingtalk",):
+            return _get_openim_platform_status(channel_id)
         return "○", "未配置"
 
     channel_cfg = channels_config[channel_id]
@@ -159,17 +168,44 @@ def get_channel_status(channel_id: str) -> tuple[str, str]:
     return "✓", "已配置"
 
 
-# Import and register built-in channels
-from .email import EmailChannel
-from .feishu import FeishuChannel
-from .imessage import IMessageChannel
-from .qqbot import QQBotChannel
-from .system import SystemChannel
-from .wecom import WeComChannel
+def _get_openim_platform_status(platform: str) -> tuple[str, str]:
+    """Check openim.yml for a specific platform config."""
+    from pathlib import Path
 
-CHANNEL_REGISTRY["email"] = EmailChannel
-CHANNEL_REGISTRY["feishu"] = FeishuChannel
-CHANNEL_REGISTRY["imessage"] = IMessageChannel
-CHANNEL_REGISTRY["qqbot"] = QQBotChannel
-CHANNEL_REGISTRY["system"] = SystemChannel
-CHANNEL_REGISTRY["wecom"] = WeComChannel
+    openim_path = Path.home() / ".config" / "claw-cron" / "openim.yml"
+    if not openim_path.exists():
+        return "○", "未配置"
+
+    try:
+        import yaml
+
+        with openim_path.open() as f:
+            data = yaml.safe_load(f) or {}
+
+        channels = data.get("channels", [])
+        for ch in channels:
+            if ch.get("platform_name") == platform:
+                if ch.get("app_id") and ch.get("app_secret"):
+                    return "✓", "已配置"
+                return "⚠", "配置不完整"
+
+        return "○", "未配置"
+    except Exception:
+        return "⚠", "配置不完整"
+
+
+CHANNEL_REGISTRY: dict[str, type[MessageChannel]] = {}
+
+
+def _register_channels() -> None:
+    """Register all built-in channels."""
+    CHANNEL_REGISTRY["email"] = EmailChannel
+    CHANNEL_REGISTRY["feishu"] = FeishuChannel
+    CHANNEL_REGISTRY["imessage"] = IMessageChannel
+    CHANNEL_REGISTRY["qqbot"] = QQBotChannel
+    CHANNEL_REGISTRY["system"] = SystemChannel
+    CHANNEL_REGISTRY["wecom"] = WeComChannel
+    CHANNEL_REGISTRY["dingtalk"] = lambda c=None: OpenIMBaseChannel("dingtalk", c)  # type: ignore[assignment]
+
+
+_register_channels()
